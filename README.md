@@ -1,19 +1,19 @@
-# 🐬 Dolphin Maker
+# 🐬 Dolphin CLI
 
 CLI tool for composable codebase edits - add pricing, AI assistants, and create pages with ease.
 
 ## Installation
 
 ```bash
-npx dolphin-maker@latest
+npx dolphin-cli@latest
 # or install globally
-npm install -g dolphin-maker
+npm install -g dolphin-cli
 ```
 
 ## Usage
 
 ```bash
-dolphin-maker <command> [options]
+dolphin-cli <command> [options]
 ```
 
 ## Commands
@@ -26,7 +26,7 @@ Add complete billing infrastructure to your app:
 - `check()` and `track()` abstractions for feature gating
 
 ```bash
-dolphin-maker pricing [options]
+dolphin-cli pricing [options]
 
 Options:
   -y, --yes                 Skip confirmation prompts
@@ -36,7 +36,7 @@ Options:
 **Example:**
 ```bash
 # Setup Stripe billing
-dolphin-maker pricing --provider stripe
+dolphin-cli pricing --provider stripe
 
 # In your code
 import { check, track } from './server/pricing';
@@ -58,7 +58,7 @@ Setup AI assistant infrastructure within user shards:
 - Client utilities for easy integration
 
 ```bash
-dolphin-maker ai-assistant [options]
+dolphin-cli ai-assistant [options]
 
 Options:
   -y, --yes                 Skip confirmation prompts
@@ -69,7 +69,7 @@ Options:
 **Example:**
 ```bash
 # Setup OpenAI assistant
-dolphin-maker ai-assistant --provider openai --model gpt-4
+dolphin-cli ai-assistant --provider openai --model gpt-4
 
 # In your component
 import { useAIConversation } from './utils/ai-assistant';
@@ -83,7 +83,7 @@ await sendMessage(conversationId, "Hello, how can you help?");
 Create static or dynamic pages with proper structure:
 
 ```bash
-dolphin-maker create-page <name> [options]
+dolphin-cli create-page <name> [options]
 
 Arguments:
   name                     Name of the page (e.g., "about", "pricing")
@@ -96,7 +96,7 @@ Options:
 #### Static Pages
 Simple HTML pages with SolidJS and shadcn/ui included:
 ```bash
-dolphin-maker create-page about --type static
+dolphin-cli create-page about --type static
 ```
 
 Creates:
@@ -106,7 +106,7 @@ Creates:
 #### Dynamic Pages
 Full SolidJS pages with context, data loading, and state management:
 ```bash
-dolphin-maker create-page dashboard --type dynamic
+dolphin-cli create-page dashboard --type dynamic
 ```
 
 Creates:
@@ -120,7 +120,7 @@ Creates:
 
 ## Project Structure Expected
 
-Dolphin Maker expects your project to follow this structure:
+Dolphin CLI expects your project to follow this structure:
 
 ```
 project/
@@ -169,31 +169,31 @@ OLLAMA_HOST=http://localhost:11434
 
 1. **Initialize pricing for your SaaS:**
 ```bash
-dolphin-maker pricing --provider stripe
+dolphin-cli pricing --provider stripe
 ```
 
 2. **Add AI chat capabilities:**
 ```bash
-dolphin-maker ai-assistant --provider openai
+dolphin-cli ai-assistant --provider openai
 ```
 
 3. **Create a pricing page:**
 ```bash
-dolphin-maker create-page pricing --type static
+dolphin-cli create-page pricing --type static
 ```
 
 4. **Create a user dashboard:**
 ```bash
-dolphin-maker create-page dashboard --type dynamic
+dolphin-cli create-page dashboard --type dynamic
 ```
 
 ## Development
 
-To contribute to Dolphin Maker:
+To contribute to Dolphin CLI:
 
 ```bash
-git clone https://github.com/your-username/dolphin-maker
-cd dolphin-maker
+git clone https://github.com/your-username/dolphin-cli
+cd dolphin-cli
 npm install
 npm run dev
 ```
@@ -215,4 +215,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Credits
 
-Built with 🐬 by the Dolphin Maker team
+Built with 🐬 by the Dolphin CLI team

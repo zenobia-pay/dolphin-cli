@@ -3,12 +3,16 @@ import prompts from 'prompts';
 import chalk from 'chalk';
 import ora from 'ora';
 import fs from 'fs-extra';
+import path from 'path';
 import { updateViteConfig } from '../utils/vite.js';
 
 export const createPageCommand = new Command('create-page')
   .description('Create a new static or dashboard page')
   .argument('<name>', 'Name of the page (e.g., "about", "pricing")')
   .option('-t, --type <type>', 'Page type (static, dashboard)', 'static')
+  .option('-s, --schemas <path>', 'Path to request-response-schemas file', 'shared/types/request-response-schemas.ts')
+  .option('-r, --routes <path>', 'Path to routes index.ts file', 'src/index.ts')
+  .option('-u, --user-shard <path>', 'Path to UserShard.ts file', 'src/durable-objects/user-shard/UserShard.ts')
   .option('-y, --yes', 'Skip confirmation prompts')
   .action(async (name, options) => {
     console.log(chalk.blue.bold(`\n📄 Creating ${options.type} page: ${name}\n`));
@@ -47,7 +51,7 @@ export const createPageCommand = new Command('create-page')
       if (options.type === 'static') {
         await createStaticPageFlow(name, spinner);
       } else {
-        await createDashboardPageFlow(name, spinner);
+        await createDashboardPageFlow(name, spinner, options.schemas, options.routes, options.userShard);
       }
 
       console.log(chalk.green.bold(`\n✅ ${options.type.charAt(0).toUpperCase() + options.type.slice(1)} page "${name}" created successfully!\n`));
@@ -321,7 +325,7 @@ async function createStaticPageFlow(name: string, spinner: any) {
   spinner.succeed('Updated vite.config.ts');
 }
 
-async function createDashboardPageFlow(name: string, spinner: any) {
+async function createDashboardPageFlow(name: string, spinner: any, schemasPath: string, routesPath: string, userShardPath: string) {
   const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
   
   // Step 1: Create index.html (simple like dashboard)
@@ -382,7 +386,7 @@ import { buildingStorefront } from "solid-heroicons/solid";
 import { arrowRightOnRectangle } from "solid-heroicons/outline";
 import OverviewView from "./OverviewView";
 import SettingsView from "./SettingsView";
-import { apiClient } from "../clientApi/clientApi";
+import { ${name}ApiClient } from "./${capitalizedName}ApiClient";
 
 const authClient = createAuthClient({
   baseURL: window.location.origin,
@@ -557,7 +561,7 @@ export default function ${capitalizedName}() {
   // Load dashboard data using createResource
   const [${name}Data] = createResource(async () => {
     try {
-      const data = await apiClient.load${capitalizedName}();
+      const data = await ${name}ApiClient.load${capitalizedName}();
       console.log("${capitalizedName} data:", data);
       return data;
     } catch (error) {
@@ -622,11 +626,12 @@ export default function ${capitalizedName}() {
   on,
 } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
-import { AutosaveService } from "../services/AutosaveService";
-import type { ${capitalizedName}Event } from "@shared/types/events";
+import { ${capitalizedName}AutosaveService } from "./${capitalizedName}AutosaveService";
+import { ${capitalizedName}UndoRedoService } from "./${capitalizedName}UndoRedoService";
+import type { ${capitalizedName}Event } from "@shared/types/${name}Events";
 import type { User } from "better-auth";
 import { process${capitalizedName}EventQueue } from "./${name}EventProcessor";
-import { apiClient } from "../clientApi/clientApi";
+import { ${name}ApiClient } from "./${capitalizedName}ApiClient";
 
 export interface ${capitalizedName}Store {
   // User data
@@ -651,7 +656,8 @@ export interface ${capitalizedName}Actions {
 interface ${capitalizedName}ContextType {
   store: ${capitalizedName}Store;
   actions: ${capitalizedName}Actions;
-  autosave: AutosaveService<${capitalizedName}Event>;
+  autosave: ${capitalizedName}AutosaveService;
+  undoRedo: ${capitalizedName}UndoRedoService;
   emitEvent: (event: ${capitalizedName}Event) => void;
 }
 
@@ -670,32 +676,31 @@ export function ${capitalizedName}Provider(props: {
     data: props.initialData,
   });
 
-  // Initialize autosave service
-  const autosave = new AutosaveService<${capitalizedName}Event>({
-    endpoint: "/api/save",
-    onError: (error) => setStore("error", error.message),
-    onSave: (events) => {
-      // Process events locally
-      process${capitalizedName}EventQueue(events, store, setStore);
-    },
-  });
+  // Initialize services
+  const autosave = new ${capitalizedName}AutosaveService();
+  const undoRedo = new ${capitalizedName}UndoRedoService();
 
   const actions: ${capitalizedName}Actions = {
     setCurrentView: (view) => setStore("currentView", view),
   };
 
   const emitEvent = (event: ${capitalizedName}Event) => {
-    autosave.addEvent(event);
+    // Queue for autosave
+    autosave.queueChange(event as any);
+    
+    // Process locally
+    process${capitalizedName}EventQueue([event], store, setStore);
   };
 
   // Cleanup on unmount
   onCleanup(() => {
     autosave.destroy();
+    undoRedo.clear();
   });
 
   return (
     <${capitalizedName}Context.Provider
-      value={{ store, actions, autosave, emitEvent }}
+      value={{ store, actions, autosave, undoRedo, emitEvent }}
     >
       {props.children}
     </${capitalizedName}Context.Provider>
@@ -715,7 +720,7 @@ export function use${capitalizedName}() {
   // Step 5: Create event processor
   const eventProcessor = `import type { SetStoreFunction } from "solid-js/store";
 import type { ${capitalizedName}Store } from "./${capitalizedName}Context";
-import type { ${capitalizedName}Event } from "@shared/types/events";
+import type { ${capitalizedName}Event } from "@shared/types/${name}Events";
 
 export function process${capitalizedName}EventQueue(
   events: ${capitalizedName}Event[],
@@ -837,13 +842,245 @@ export default SettingsView;`;
   await updateViteConfig(name);
   spinner.succeed('Updated vite.config.ts');
 
-  // Step 8: Create load endpoint info
+  // Step 8: Create ApiClient file and append types to schemas
+  spinner.start('Creating API client and updating types...');
+  
+  // Calculate relative import path from the API client location to the schemas file
+  const apiClientPath = `src/client/${name}/${capitalizedName}ApiClient.ts`;
+  const relativeImportPath = path.relative(
+    path.dirname(apiClientPath),
+    schemasPath.replace(/\.ts$/, '')
+  ).replace(/\\/g, '/');
+  
+  const apiClientFile = `import type { 
+  Load${capitalizedName}Response, 
+  Load${capitalizedName}Request,
+  Save${capitalizedName}Request, 
+  Save${capitalizedName}Response 
+} from "${relativeImportPath.startsWith('.') ? relativeImportPath : './' + relativeImportPath}";
+
+class ${capitalizedName}ApiClient {
+  private baseUrl = "/api/${name}";
+
+  async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
+    const response = await fetch(\`\${this.baseUrl}/load\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to load ${name}");
+    return response.json();
+  }
+
+  async save${capitalizedName}(
+    changes: Save${capitalizedName}Request["changes"]
+  ): Promise<Save${capitalizedName}Response> {
+    const response = await fetch(\`\${this.baseUrl}/save\`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes }),
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to save ${name} changes");
+    return response.json();
+  }
+}
+
+export const ${name}ApiClient = new ${capitalizedName}ApiClient();`;
+
+  await fs.outputFile(`src/client/${name}/${capitalizedName}ApiClient.ts`, apiClientFile);
+  
+  // Append types to schemas file
+  const typesToAppend = `
+// ${capitalizedName} API Types
+export const Load${capitalizedName}RequestSchema = z.object({});
+
+export const Load${capitalizedName}ResponseSchema = z.object({
+  data: z.any(), // Update this with your specific data schema
+  // Add your response properties here
+});
+
+export const Save${capitalizedName}RequestSchema = z.object({
+  changes: z.array(z.object({
+    type: z.string(),
+    payload: z.any(),
+  })),
+});
+
+export const Save${capitalizedName}ResponseSchema = z.object({
+  success: z.boolean(),
+  processedCount: z.number().optional(),
+  // Add your response properties here
+});
+
+export type Load${capitalizedName}Request = z.infer<typeof Load${capitalizedName}RequestSchema>;
+export type Load${capitalizedName}Response = z.infer<typeof Load${capitalizedName}ResponseSchema>;
+export type Save${capitalizedName}Request = z.infer<typeof Save${capitalizedName}RequestSchema>;
+export type Save${capitalizedName}Response = z.infer<typeof Save${capitalizedName}ResponseSchema>;`;
+
+  if (await fs.pathExists(schemasPath)) {
+    const existingContent = await fs.readFile(schemasPath, 'utf8');
+    const updatedContent = existingContent + typesToAppend;
+    await fs.writeFile(schemasPath, updatedContent);
+    spinner.text = 'Created API client and updated schemas';
+  } else {
+    // Create the schemas file if it doesn't exist
+    const schemasContent = `import { z } from "zod";
+
+export const ErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  statusCode: z.number(),
+});
+
+export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+${typesToAppend}`;
+    
+    await fs.outputFile(schemasPath, schemasContent);
+    spinner.text = 'Created API client and schemas file';
+  }
+  
+  spinner.succeed('Created API client and updated types');
+
+  // Step 9: Create AutosaveService
+  spinner.start('Creating AutosaveService...');
+  
+  const autosaveService = `import type { Change } from '@shared/types/events';
+import { ${name}ApiClient } from './${capitalizedName}ApiClient';
+
+export class ${capitalizedName}AutosaveService {
+  private changeQueue: Change[] = [];
+  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly DEBOUNCE_MS = 1000;
+
+  queueChange(change: Change) {
+    this.changeQueue.push(change);
+    this.scheduleSave();
+  }
+
+  private scheduleSave() {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+
+    this.saveTimeout = setTimeout(() => {
+      this.flush();
+    }, this.DEBOUNCE_MS);
+  }
+
+  async flush() {
+    if (this.changeQueue.length === 0) return;
+
+    const changes = [...this.changeQueue];
+    this.changeQueue = [];
+
+    try {
+      await ${name}ApiClient.save${capitalizedName}(changes);
+    } catch (error) {
+      console.error('Failed to save changes:', error);
+      // Re-add changes to queue on failure
+      this.changeQueue.unshift(...changes);
+    }
+  }
+
+  destroy() {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    this.flush();
+  }
+}`;
+
+  await fs.outputFile(`src/client/${name}/${capitalizedName}AutosaveService.ts`, autosaveService);
+  spinner.succeed('Created AutosaveService');
+
+  // Step 10: Create UndoRedoService
+  spinner.start('Creating UndoRedoService...');
+  
+  const undoRedoService = `interface Action {
+  undo: () => void;
+  redo: () => void;
+  description?: string;
+}
+
+export class ${capitalizedName}UndoRedoService {
+  private undoStack: Action[] = [];
+  private redoStack: Action[] = [];
+  private maxStackSize = 100;
+
+  pushAction(action: Action) {
+    this.undoStack.push(action);
+    this.redoStack = [];
+
+    if (this.undoStack.length > this.maxStackSize) {
+      this.undoStack.shift();
+    }
+  }
+
+  undo() {
+    const action = this.undoStack.pop();
+    if (!action) return;
+
+    action.undo();
+    this.redoStack.push(action);
+  }
+
+  redo() {
+    const action = this.redoStack.pop();
+    if (!action) return;
+
+    action.redo();
+    this.undoStack.push(action);
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  clear() {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
+  getUndoDescription(): string | undefined {
+    return this.undoStack[this.undoStack.length - 1]?.description;
+  }
+
+  getRedoDescription(): string | undefined {
+    return this.redoStack[this.redoStack.length - 1]?.description;
+  }
+}`;
+
+  await fs.outputFile(`src/client/${name}/${capitalizedName}UndoRedoService.ts`, undoRedoService);
+  spinner.succeed('Created UndoRedoService');
+
+  // Step 11: Add routes to index.ts
+  await addRoutesToIndex(name, routesPath, spinner);
+
+  // Step 12: Add UserShard functions
+  await addUserShardFunctions(name, userShardPath, spinner);
+
+  // Step 13: Create events file
+  await createEventsFile(name, spinner);
+
+  // Step 14: Update vite.config.ts
+  spinner.start('Updating vite.config.ts...');
+  await updateViteConfig(name);
+  spinner.succeed('Updated vite.config.ts');
+
+  // Step 12: Create load endpoint info
   spinner.start('Creating API integration info...');
   
   console.log(chalk.yellow('\n📋 Add these to your server:'));
   console.log(chalk.gray('1. Add to your load endpoint (src/server/api/load.ts):'));
   console.log(chalk.cyan(`
-app.get("/api/load/${name}", authMiddleware, async (c) => {
+app.get("/api/${name}/load", authMiddleware, async (c) => {
   const userId = c.get("userId");
   
   // Load ${name}-specific data
@@ -854,22 +1091,287 @@ app.get("/api/load/${name}", authMiddleware, async (c) => {
   return c.json(data);
 });`));
 
-  console.log(chalk.gray('2. Add to clientApi (src/client/clientApi/clientApi.ts):'));
+  console.log(chalk.gray('2. Add save endpoint (src/server/api/save.ts):'));
   console.log(chalk.cyan(`
-async load${capitalizedName}() {
-  const response = await fetch("/api/load/${name}", {
-    credentials: "include",
-  });
-  if (!response.ok) throw new Error("Failed to load ${name}");
-  return response.json();
-},`));
+app.post("/api/${name}/save", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const { changes } = await c.req.json();
+  
+  // Process changes
+  for (const change of changes) {
+    switch (change.type) {
+      // Handle different change types
+    }
+  }
+  
+  return c.json({ success: true });
+});`));
 
   console.log(chalk.gray('3. Add event types to @shared/types/events.ts:'));
   console.log(chalk.cyan(`
 export type ${capitalizedName}Event = {
   type: "SAMPLE_EVENT";
   // Add your event properties
-};`));
+};
+
+export type Change = ${capitalizedName}Event | OtherEvent;`));
   
   spinner.succeed('API integration info created');
+}
+
+async function addRoutesToIndex(name: string, routesPath: string, spinner: any) {
+  spinner.start('Adding routes to index.ts...');
+  
+  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+  
+  if (!(await fs.pathExists(routesPath))) {
+    spinner.warn(`Routes file not found at ${routesPath}, skipping route generation`);
+    return;
+  }
+
+  const routesContent = await fs.readFile(routesPath, 'utf8');
+  
+  // Check if we need to add imports
+  let updatedContent = routesContent;
+  
+  // Add schema imports if not present
+  if (!routesContent.includes(`Load${capitalizedName}ResponseSchema`)) {
+    const importMatch = routesContent.match(/import {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/);
+    if (importMatch) {
+      const existingImports = importMatch[1];
+      const newImports = `${existingImports.trim()},
+  Load${capitalizedName}ResponseSchema,
+  Save${capitalizedName}RequestSchema,
+  Save${capitalizedName}ResponseSchema`;
+      updatedContent = updatedContent.replace(importMatch[0], 
+        `import {${newImports}
+} from "@shared/types/request-response-schemas";`);
+    } else {
+      // Add new import if none exists
+      const firstImportIndex = updatedContent.indexOf('import');
+      if (firstImportIndex !== -1) {
+        const importToAdd = `import {
+  Load${capitalizedName}ResponseSchema,
+  Save${capitalizedName}RequestSchema,
+  Save${capitalizedName}ResponseSchema,
+} from "@shared/types/request-response-schemas";
+`;
+        updatedContent = updatedContent.slice(0, firstImportIndex) + importToAdd + updatedContent.slice(firstImportIndex);
+      }
+    }
+  }
+
+  // Add routes before the last route or at the end
+  const routesToAdd = `
+// ${capitalizedName} endpoints
+app.get("/api/${name}/load", async (c) => {
+  const user = await getAuthenticatedUser(c);
+  if (!user) {
+    return sendError(c, 401, "Unauthorized");
+  }
+
+  const shardId = c.env.USER_SHARD.idFromName(user.id);
+  const userShard = c.env.USER_SHARD.get(shardId);
+
+  const result = await userShard.load${capitalizedName}();
+
+  if ("error" in result) {
+    return sendError(c, 500, result.error);
+  }
+
+  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+});
+
+app.post(
+  "/api/${name}/save",
+  zValidator("json", Save${capitalizedName}RequestSchema),
+  async (c) => {
+    try {
+      const user = await getAuthenticatedUser(c);
+      if (!user) {
+        return sendError(c, 401, "Unauthorized");
+      }
+
+      const { changes } = c.req.valid("json");
+
+      const shardId = c.env.USER_SHARD.idFromName(user.id);
+      const userShard = c.env.USER_SHARD.get(shardId);
+
+      const result = await userShard.save${capitalizedName}(changes as Change[]);
+      if ("error" in result) {
+        return sendError(c, result.statusCode as any, result.error);
+      }
+
+      return send(c, Save${capitalizedName}ResponseSchema, result, 200);
+    } catch (error) {
+      console.error("Error saving ${name}:", error);
+      return sendError(c, 500, "Internal server error");
+    }
+  }
+);
+`;
+
+  // Find the export default line and add routes before it
+  const exportDefaultIndex = updatedContent.lastIndexOf('export default');
+  if (exportDefaultIndex !== -1) {
+    updatedContent = updatedContent.slice(0, exportDefaultIndex) + routesToAdd + '\n' + updatedContent.slice(exportDefaultIndex);
+  } else {
+    // If no export default, add at the end
+    updatedContent += routesToAdd;
+  }
+
+  await fs.writeFile(routesPath, updatedContent);
+  spinner.succeed('Added routes to index.ts');
+}
+
+async function addUserShardFunctions(name: string, userShardPath: string, spinner: any) {
+  spinner.start('Adding UserShard functions...');
+  
+  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+  
+  if (!(await fs.pathExists(userShardPath))) {
+    spinner.warn(`UserShard file not found at ${userShardPath}, skipping UserShard generation`);
+    return;
+  }
+
+  const userShardContent = await fs.readFile(userShardPath, 'utf8');
+  
+  // Add type imports if not present
+  let updatedContent = userShardContent;
+  
+  if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
+    // Find the import block for request-response-schemas and add our types
+    const importMatch = updatedContent.match(/import type {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/);
+    if (importMatch) {
+      const existingImports = importMatch[1];
+      const newImports = `${existingImports.trim()},
+  Load${capitalizedName}Response,
+  Save${capitalizedName}Response`;
+      updatedContent = updatedContent.replace(importMatch[0], 
+        `import type {${newImports}
+} from "@shared/types/request-response-schemas";`);
+    }
+  }
+
+  // Add the load and save functions before the closing brace of the class
+  const functionsToAdd = `
+  async load${capitalizedName}(): Promise<Load${capitalizedName}Response | ErrorResponse> {
+    try {
+      // TODO: Implement load logic for ${name}
+      // Example: Query your schema tables and return data
+      const data = {
+        // Add your data loading logic here
+      };
+
+      return {
+        data,
+        // Add other response fields as needed
+      } as Load${capitalizedName}Response;
+    } catch (error) {
+      console.error("Error loading ${name}:", error);
+      return {
+        error: "Failed to load ${name}",
+        success: false,
+        statusCode: 500,
+      };
+    }
+  }
+
+  async save${capitalizedName}(
+    changes: Change[]
+  ): Promise<Save${capitalizedName}Response | ErrorResponse> {
+    try {
+      let processedCount = 0;
+      const failedChanges: Change[] = [];
+
+      for (const change of changes) {
+        try {
+          await handleChange(this.db, change);
+          processedCount++;
+        } catch (error) {
+          console.error("Error processing change:", error, change);
+          failedChanges.push(change);
+        }
+      }
+
+      return {
+        success: true,
+        processedCount,
+        totalChanges: changes.length,
+        ...(failedChanges.length > 0 && { failedChanges }),
+      } as Save${capitalizedName}Response;
+    } catch (error) {
+      console.error("Error saving ${name}:", error);
+      return {
+        error: "Failed to save ${name} changes",
+        success: false,
+        statusCode: 500,
+      };
+    }
+  }
+`;
+
+  // Find the last method in the class and add our functions before the closing brace
+  const lastBraceIndex = updatedContent.lastIndexOf('}');
+  if (lastBraceIndex !== -1) {
+    updatedContent = updatedContent.slice(0, lastBraceIndex) + functionsToAdd + '\n' + updatedContent.slice(lastBraceIndex);
+  }
+
+  await fs.writeFile(userShardPath, updatedContent);
+  spinner.succeed('Added UserShard functions');
+}
+
+async function createEventsFile(name: string, spinner: any) {
+  spinner.start('Creating events file...');
+  
+  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+  
+  const eventsContent = `import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
+import type * as schema from "~/durable-objects/user-shard/schema";
+
+export type Base${capitalizedName}Event =
+  | {
+      type: "SAMPLE_${name.toUpperCase()}_EVENT";
+      sampleData: string;
+      previousValue?: string;
+      newValue: string;
+    };
+
+export type ${capitalizedName}Event = Base${capitalizedName}Event;
+
+/**
+ * Persistence metadata added by the server
+ */
+export interface PersistenceMetadata {
+  id: string;
+  timestamp: number;
+  description: string;
+}
+
+/**
+ * Change type for server-side persistence
+ * Includes all event data plus persistence metadata
+ */
+export type Change = Base${capitalizedName}Event & PersistenceMetadata;
+
+/**
+ * Client-side event type (alias for Base${capitalizedName}Event)
+ */
+export type EditorEvent = Base${capitalizedName}Event;
+
+/**
+ * Types for change handlers
+ */
+export type ChangeType = Change["type"];
+
+export type ChangeHandler<T extends Change = Change> = (
+  db: DrizzleSqliteDODatabase<typeof schema>,
+  change: T
+) => Promise<{ success: boolean; result?: unknown }>;
+
+export type AssertNever = (x: never) => never;
+`;
+
+  await fs.outputFile(`shared/types/${name}Events.ts`, eventsContent);
+  spinner.succeed('Created events file');
 }

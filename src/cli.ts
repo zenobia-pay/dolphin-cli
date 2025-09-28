@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { initCommand } from './commands/init.js';
 import { pricingCommand } from './commands/pricing.js';
 import { aiAssistantCommand } from './commands/ai-assistant.js';
 import { createPageCommand } from './commands/create-page.js';
@@ -19,12 +20,13 @@ const packageJson = JSON.parse(
 const program = new Command();
 
 program
-  .name('dolphin-maker')
+  .name('dolphin-cli')
   .description(chalk.blue('CLI for composable codebase edits'))
   .version(packageJson.version)
   .showHelpAfterError('(add --help for additional information)');
 
 // Add commands
+program.addCommand(initCommand);
 program.addCommand(pricingCommand);
 program.addCommand(aiAssistantCommand);
 program.addCommand(createPageCommand);
@@ -35,7 +37,7 @@ program.parse(process.argv);
 // Show help if no command is provided
 if (!process.argv.slice(2).length) {
   console.log(chalk.blue(`
-   🐬 ${chalk.bold('Dolphin Maker')} - Composable Codebase Tools
+   🐬 ${chalk.bold('Dolphin CLI')} - Composable Codebase Tools
   `));
   program.outputHelp();
 }

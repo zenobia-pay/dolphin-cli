@@ -1,0 +1,13 @@
+{
+  "name": "dolphin-cli-test",
+  "version": "1.0.0",
+  "description": "Test examples for Dolphin CLI",
+  "scripts": {
+    "generate": "./generate-all.sh",
+    "test:basic": "cd examples/basic-init && npm install && npm run dev",
+    "test:pricing": "cd examples/init-plus-pricing && npm install && npm run dev", 
+    "test:ai": "cd examples/init-plus-ai && npm install && npm run dev",
+    "test:pages": "cd examples/init-plus-pages && npm install && npm run dev",
+    "test:full": "cd examples/full-example && npm install && npm run dev"
+  }
+}

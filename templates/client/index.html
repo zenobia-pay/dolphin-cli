@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{PROJECT_NAME}} - Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/basecoat.cdn.min.css"
+    />
+    <script
+      src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.2/dist/js/all.min.js"
+      defer
+    ></script>
+    <style>
+      /* Only minimal custom styles for animations */
+      @keyframes scroll {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(-50%);
+        }
+      }
+      .testimonials-track {
+        animation: scroll 30s linear infinite;
+      }
+      .testimonials-container {
+        position: relative;
+      }
+      .testimonials-container::before,
+      .testimonials-container::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100px;
+        z-index: 1;
+        pointer-events: none;
+      }
+      .testimonials-container::before {
+        left: 0;
+        background: linear-gradient(to right, white, transparent);
+      }
+      .testimonials-container::after {
+        right: 0;
+        background: linear-gradient(to left, white, transparent);
+      }
+
+      /* Mobile responsive */
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none !important;
+        }
+        .features-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .feature-large {
+          grid-column: span 1 !important;
+        }
+        .hero-title {
+          font-size: 3rem !important;
+        }
+        .description-title {
+          font-size: 2rem !important;
+        }
+        .description-subtitle {
+          font-size: 1.125rem !important;
+        }
+        .testimonials-container::before,
+        .testimonials-container::after {
+          width: 50px;
+        }
+      }
+    </style>
+  </head>
+  <body
+    style="
+      margin: 0;
+      font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    "
+  >
+    <!-- Navigation -->
+    <nav
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.5rem;
+      "
+    >
+      <div style="display: flex; align-items: center; gap: 2rem">
+        <a
+          href="/"
+          style="
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: black;
+            font-weight: 600;
+          "
+        >
+          <div
+            style="
+              width: 1.25rem;
+              height: 1.25rem;
+              background: black;
+              border-radius: 0.25rem;
+            "
+          ></div>
+          <span>{{PROJECT_NAME}}</span>
+        </a>
+        <div class="nav-links" style="display: flex; gap: 1.5rem">
+          <a
+            href="#"
+            style="
+              text-decoration: none;
+              color: #6b7280;
+              font-size: 0.875rem;
+              font-weight: 500;
+            "
+            >Docs</a
+          >
+          <a
+            href="#"
+            style="
+              text-decoration: none;
+              color: #6b7280;
+              font-size: 0.875rem;
+              font-weight: 500;
+            "
+            >Components</a
+          >
+          <a
+            href="#"
+            style="
+              text-decoration: none;
+              color: #6b7280;
+              font-size: 0.875rem;
+              font-weight: 500;
+            "
+            >Examples</a
+          >
+          <a
+            href="#"
+            style="
+              text-decoration: none;
+              color: #6b7280;
+              font-size: 0.875rem;
+              font-weight: 500;
+            "
+            >Templates</a
+          >
+        </div>
+      </div>
+      <a href="/dashboard/" class="btn btn-sm">Dashboard</a>
+    </nav>
+
+    <!-- Hero Section -->
+    <section style="text-align: center; padding: 8rem 1.5rem 6rem">
+      <h1
+        class="hero-title"
+        style="
+          font-size: 5rem;
+          font-weight: 800;
+          margin: 0 0 1.5rem 0;
+          letter-spacing: -0.025em;
+        "
+      >
+        {{PROJECT_NAME}} - Dashboard
+      </h1>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 1.5rem;
+          flex-wrap: wrap;
+          margin-top: 3rem;
+        "
+      >
+        <p style="font-size: 1.5rem; color: #6b7280; margin: 0">
+          A Dashboard SaaS Site for you
+        </p>
+        <button
+          class="btn btn-primary"
+          onclick="window.location.href='/login/'"
+        >
+          Get Started →
+        </button>
+      </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section
+      class="testimonials-container"
+      style="overflow: hidden; padding: 2rem 0"
+    >
+      <div class="testimonials-track" style="display: flex; gap: 2rem">
+        <!-- Duplicate testimonials for seamless loop -->
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "Launched my SaaS in just 2 days!"
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">
+            - Sarah Chen, Founder
+          </p>
+        </div>
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "The best dashboard template ever."
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">- Mike Johnson, CEO</p>
+        </div>
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "Saved me months of development."
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">
+            - Alex Rivera, Developer
+          </p>
+        </div>
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "Clean code, amazing support!"
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">- Emma Davis, CTO</p>
+        </div>
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "From idea to production in hours."
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">
+            - Tom Wilson, Startup
+          </p>
+        </div>
+        <!-- Duplicate for seamless loop -->
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "Launched my SaaS in just 2 days!"
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">
+            - Sarah Chen, Founder
+          </p>
+        </div>
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "The best dashboard template ever."
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">- Mike Johnson, CEO</p>
+        </div>
+        <div
+          class="card"
+          style="flex-shrink: 0; min-width: 300px; padding: 1rem"
+        >
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.875rem">
+            "Saved me months of development."
+          </p>
+          <p style="font-size: 0.75rem; color: #6b7280">
+            - Alex Rivera, Developer
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dolphin Image Section -->
+    <section style="padding: 3rem 1.5rem; max-width: 800px; margin: 0 auto">
+      <div class="card" style="padding: 0; overflow: hidden">
+        <img
+          src="/dolphin2.jpg"
+          alt="Dolphin"
+          style="width: 100%; height: auto; display: block"
+        />
+      </div>
+    </section>
+
+    <!-- Description Section -->
+    <section style="text-align: center; padding: 6rem 1.5rem 3rem">
+      <h2
+        class="description-title"
+        style="
+          font-size: 3rem;
+          font-weight: 700;
+          margin: 0 auto 1.5rem;
+          letter-spacing: -0.025em;
+          max-width: 900px;
+        "
+      >
+        Dashboards you've never seen before.
+      </h2>
+      <p
+        class="description-subtitle"
+        style="
+          font-size: 1.5rem;
+          color: #6b7280;
+          margin: 0 auto;
+          max-width: 600px;
+        "
+      >
+        Launch CRUD dashboards that your customers will love. You can do
+        anything with it.
+      </p>
+    </section>
+
+    <!-- Features Section -->
+    <section style="padding: 4rem 1.5rem; max-width: 1200px; margin: 0 auto">
+      <div
+        class="features-grid"
+        style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem"
+      >
+        <!-- Large feature card (2 columns) -->
+        <div
+          class="card feature-large"
+          style="grid-column: span 2; padding: 2rem"
+        >
+          <h3
+            style="margin: 0 0 0.5rem 0; font-size: 1.125rem; font-weight: 600"
+          >
+            Real-time Analytics
+          </h3>
+          <p
+            style="
+              margin: 0;
+              color: #6b7280;
+              font-size: 0.875rem;
+              line-height: 1.5;
+            "
+          >
+            Monitor your application performance with real-time analytics and
+            insights. Track user behavior, conversion rates, and system metrics
+            all in one place.
+          </p>
+          <div
+            style="
+              margin-top: 2rem;
+              padding: 2rem;
+              background: #f9fafb;
+              border-radius: 0.375rem;
+              min-height: 150px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <span style="color: #9ca3af">Analytics Chart Visualization</span>
+          </div>
+        </div>
+
+        <!-- Small feature card (1 column) -->
+        <div class="card" style="padding: 2rem">
+          <h3
+            style="margin: 0 0 0.5rem 0; font-size: 1.125rem; font-weight: 600"
+          >
+            User Management
+          </h3>
+          <p
+            style="
+              margin: 0;
+              color: #6b7280;
+              font-size: 0.875rem;
+              line-height: 1.5;
+            "
+          >
+            Complete user authentication and role-based access control.
+          </p>
+          <div
+            style="
+              margin-top: 2rem;
+              padding: 2rem;
+              background: #f9fafb;
+              border-radius: 0.375rem;
+              min-height: 150px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <span style="color: #9ca3af">User List</span>
+          </div>
+        </div>
+
+        <!-- Small feature card (1 column) -->
+        <div class="card" style="padding: 2rem">
+          <h3
+            style="margin: 0 0 0.5rem 0; font-size: 1.125rem; font-weight: 600"
+          >
+            API Integration
+          </h3>
+          <p
+            style="
+              margin: 0;
+              color: #6b7280;
+              font-size: 0.875rem;
+              line-height: 1.5;
+            "
+          >
+            RESTful API with automatic documentation and rate limiting.
+          </p>
+          <div
+            style="
+              margin-top: 2rem;
+              padding: 2rem;
+              background: #f9fafb;
+              border-radius: 0.375rem;
+              min-height: 150px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <span style="color: #9ca3af">API Docs</span>
+          </div>
+        </div>
+
+        <!-- Large feature card (2 columns) -->
+        <div
+          class="card feature-large"
+          style="grid-column: span 2; padding: 2rem"
+        >
+          <h3
+            style="margin: 0 0 0.5rem 0; font-size: 1.125rem; font-weight: 600"
+          >
+            Customizable Dashboard
+          </h3>
+          <p
+            style="
+              margin: 0;
+              color: #6b7280;
+              font-size: 0.875rem;
+              line-height: 1.5;
+            "
+          >
+            Drag-and-drop widgets, customizable themes, and responsive layouts.
+            Build the perfect dashboard for your users with our flexible
+            component system.
+          </p>
+          <div
+            style="
+              margin-top: 2rem;
+              padding: 2rem;
+              background: #f9fafb;
+              border-radius: 0.375rem;
+              min-height: 150px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <span style="color: #9ca3af">Dashboard Preview</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section style="text-align: center; padding: 6rem 1.5rem 4rem">
+      <h2
+        style="
+          font-size: 2.5rem;
+          font-weight: 700;
+          margin: 0 auto 1.5rem;
+          letter-spacing: -0.025em;
+          max-width: 900px;
+        "
+      >
+        Ready to build your SaaS?
+      </h2>
+      <p
+        style="
+          font-size: 1.5rem;
+          color: #6b7280;
+          margin: 0 auto 2rem;
+          max-width: 600px;
+        "
+      >
+        Join thousands of developers who ship faster with {{PROJECT_NAME}}.
+      </p>
+      <button
+        class="btn btn-primary btn-lg"
+        onclick="window.location.href='/login/'"
+      >
+        Get Started Now →
+      </button>
+    </section>
+
+    <!-- Footer -->
+    <footer style="padding: 2rem 1.5rem; border-top: 1px solid #e5e7eb">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          max-width: 1200px;
+          margin: 0 auto;
+        "
+      >
+        <div style="display: flex; align-items: center; gap: 0.5rem">
+          <div
+            style="
+              width: 1.25rem;
+              height: 1.25rem;
+              background: black;
+              border-radius: 0.25rem;
+            "
+          ></div>
+          <span style="font-weight: 600">{{PROJECT_NAME}}</span>
+        </div>
+        <p style="color: #6b7280; font-size: 0.875rem; margin: 0">
+          © 2025 {{PROJECT_NAME}}. All rights reserved.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
