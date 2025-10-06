@@ -1,31 +1,247 @@
-import { Command } from 'commander';
-import prompts from 'prompts';
-import chalk from 'chalk';
-import ora from 'ora';
-import fs from 'fs-extra';
-import path from 'path';
-import { updateViteConfig } from '../utils/vite.js';
+import { Command } from "commander";
+import prompts from "prompts";
+import chalk from "chalk";
+import ora from "ora";
+import fs from "fs-extra";
+import path from "path";
+import { updateViteConfig } from "../utils/vite.js";
 
-export const createPageCommand = new Command('create-page')
-  .description('Create a new static or dashboard page')
-  .argument('<name>', 'Name of the page (e.g., "about", "pricing")')
-  .option('-t, --type <type>', 'Page type (static, dashboard)', 'static')
-  .option('-s, --schemas <path>', 'Path to request-response-schemas file', 'shared/types/request-response-schemas.ts')
-  .option('-r, --routes <path>', 'Path to routes index.ts file', 'src/index.ts')
-  .option('-u, --user-shard <path>', 'Path to UserShard.ts file', 'src/durable-objects/user-shard/UserShard.ts')
-  .option('-y, --yes', 'Skip confirmation prompts')
+/**
+ * Convert kebab-case name to PascalCase for component names
+ * Examples: "my-page" -> "MyPage", "about" -> "About", "user-profile-settings" -> "UserProfileSettings"
+ */
+function toPascalCase(name: string): string {
+  if (!name || typeof name !== "string") {
+    throw new Error("Invalid name: must be a non-empty string");
+  }
+
+  // Split by hyphens and handle empty parts (e.g., "my--page" or "-page")
+  const parts = name.split("-").filter((part) => part.length > 0);
+
+  if (parts.length === 0) {
+    throw new Error("Invalid name: contains only hyphens");
+  }
+
+  // Capitalize each part and join
+  const pascalCase = parts
+    .map((part) => {
+      if (!/^[a-z0-9]+$/.test(part)) {
+        throw new Error(
+          `Invalid name part "${part}": must contain only lowercase letters and numbers`
+        );
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join("");
+
+  return pascalCase;
+}
+
+/**
+ * Convert kebab-case name to camelCase for variable names
+ * Examples: "my-page" -> "myPage", "about" -> "about", "user-profile-settings" -> "userProfileSettings"
+ */
+function toCamelCase(name: string): string {
+  if (!name || typeof name !== "string") {
+    throw new Error("Invalid name: must be a non-empty string");
+  }
+
+  // Split by hyphens and handle empty parts
+  const parts = name.split("-").filter((part) => part.length > 0);
+
+  if (parts.length === 0) {
+    throw new Error("Invalid name: contains only hyphens");
+  }
+
+  // First part lowercase, rest capitalized
+  const camelCase = parts
+    .map((part, index) => {
+      if (!/^[a-z0-9]+$/.test(part)) {
+        throw new Error(
+          `Invalid name part "${part}": must contain only lowercase letters and numbers`
+        );
+      }
+      if (index === 0) {
+        return part; // Keep first part lowercase
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join("");
+
+  return camelCase;
+}
+
+/**
+ * Convert kebab-case to SCREAMING_SNAKE_CASE for constants
+ * Examples: "my-page" -> "MY_PAGE", "about" -> "ABOUT"
+ */
+function toScreamingSnakeCase(name: string): string {
+  return name.toUpperCase().replace(/-/g, "_");
+}
+
+export const createPageCommand = new Command("create-page")
+  .description("Create a new static or dashboard page")
+  .argument("<name>", 'Name of the page (e.g., "about", "pricing")')
+  .option("-t, --type <type>", "Page type (static, dashboard)", "static")
+  .option(
+    "-s, --schemas <path>",
+    "Path to request-response-schemas file",
+    "shared/types/request-response-schemas.ts"
+  )
+  .option("-r, --routes <path>", "Path to routes index.ts file", "src/index.ts")
+  .option(
+    "-u, --user-shard <path>",
+    "Path to UserShard.ts file",
+    "src/durable-objects/user-shard/UserShard.ts"
+  )
+  .option("-y, --yes", "Skip confirmation prompts")
   .action(async (name, options) => {
-    console.log(chalk.blue.bold(`\n📄 Creating ${options.type} page: ${name}\n`));
+    console.log(
+      chalk.blue.bold(`\n📄 Creating ${options.type} page: ${name}\n`)
+    );
 
-    // Validate page name
+    // Comprehensive validation for page name
+
+    // Check for empty or whitespace-only name
+    if (!name || name.trim().length === 0) {
+      console.error(chalk.red("Page name cannot be empty"));
+      process.exit(1);
+    }
+
+    // Check for whitespace
+    if (/\s/.test(name)) {
+      console.error(chalk.red("Page name cannot contain spaces or whitespace"));
+      process.exit(1);
+    }
+
+    // Check for invalid characters (allow only lowercase letters, numbers, and hyphens)
     if (!/^[a-z][a-z0-9-]*$/.test(name)) {
-      console.error(chalk.red('Page name must start with a letter and contain only lowercase letters, numbers, and hyphens'));
+      console.error(
+        chalk.red(
+          "Page name must start with a letter and contain only lowercase letters, numbers, and hyphens"
+        )
+      );
+      process.exit(1);
+    }
+
+    // Check for consecutive hyphens
+    if (name.includes("--")) {
+      console.error(chalk.red("Page name cannot contain consecutive hyphens"));
+      process.exit(1);
+    }
+
+    // Check for leading/trailing hyphens
+    if (name.startsWith("-") || name.endsWith("-")) {
+      console.error(chalk.red("Page name cannot start or end with a hyphen"));
+      process.exit(1);
+    }
+
+    // Check for reserved JavaScript/TypeScript keywords
+    const reservedKeywords = [
+      "abstract",
+      "arguments",
+      "await",
+      "boolean",
+      "break",
+      "byte",
+      "case",
+      "catch",
+      "char",
+      "class",
+      "const",
+      "continue",
+      "debugger",
+      "default",
+      "delete",
+      "do",
+      "double",
+      "else",
+      "enum",
+      "eval",
+      "export",
+      "extends",
+      "false",
+      "final",
+      "finally",
+      "float",
+      "for",
+      "function",
+      "goto",
+      "if",
+      "implements",
+      "import",
+      "in",
+      "instanceof",
+      "int",
+      "interface",
+      "let",
+      "long",
+      "native",
+      "new",
+      "null",
+      "package",
+      "private",
+      "protected",
+      "public",
+      "return",
+      "short",
+      "static",
+      "super",
+      "switch",
+      "synchronized",
+      "this",
+      "throw",
+      "throws",
+      "transient",
+      "true",
+      "try",
+      "typeof",
+      "var",
+      "void",
+      "volatile",
+      "while",
+      "with",
+      "yield",
+    ];
+
+    if (reservedKeywords.includes(name)) {
+      console.error(
+        chalk.red(
+          `Page name "${name}" is a reserved JavaScript/TypeScript keyword`
+        )
+      );
+      process.exit(1);
+    }
+
+    // Check for common reserved names that might cause conflicts
+    const reservedNames = ["index", "default", "constructor", "prototype"];
+    if (reservedNames.includes(name)) {
+      console.error(
+        chalk.red(
+          `Page name "${name}" is a reserved name and might cause conflicts`
+        )
+      );
+      process.exit(1);
+    }
+
+    // Validate that the name can be converted to PascalCase
+    try {
+      toPascalCase(name);
+      toCamelCase(name);
+    } catch (error) {
+      console.error(
+        chalk.red(
+          `Invalid page name: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        )
+      );
       process.exit(1);
     }
 
     // Check if page already exists
     const pagePath = `src/client/${name}`;
-      
+
     if (await fs.pathExists(pagePath)) {
       console.error(chalk.red(`Page "${name}" already exists at ${pagePath}`));
       process.exit(1);
@@ -33,14 +249,14 @@ export const createPageCommand = new Command('create-page')
 
     if (!options.yes) {
       const response = await prompts({
-        type: 'confirm',
-        name: 'value',
+        type: "confirm",
+        name: "value",
         message: `Create a ${options.type} page at ${pagePath}?`,
-        initial: true
+        initial: true,
       });
 
       if (!response.value) {
-        console.log(chalk.yellow('Page creation cancelled'));
+        console.log(chalk.yellow("Page creation cancelled"));
         return;
       }
     }
@@ -48,35 +264,46 @@ export const createPageCommand = new Command('create-page')
     const spinner = ora();
 
     try {
-      if (options.type === 'static') {
+      if (options.type === "static") {
         await createStaticPageFlow(name, spinner);
       } else {
-        await createDashboardPageFlow(name, spinner, options.schemas, options.routes, options.userShard);
+        await createDashboardPageFlow(
+          name,
+          spinner,
+          options.schemas,
+          options.routes,
+          options.userShard
+        );
       }
 
-      console.log(chalk.green.bold(`\n✅ ${options.type.charAt(0).toUpperCase() + options.type.slice(1)} page "${name}" created successfully!\n`));
-      console.log(chalk.cyan('Next steps:'));
+      console.log(
+        chalk.green.bold(
+          `\n✅ ${
+            options.type.charAt(0).toUpperCase() + options.type.slice(1)
+          } page "${name}" created successfully!\n`
+        )
+      );
+      console.log(chalk.cyan("Next steps:"));
       console.log(chalk.gray(`1. Navigate to http://localhost:3000/${name}`));
-      console.log(chalk.gray('2. Customize the page content'));
-      if (options.type === 'dashboard') {
-        console.log(chalk.gray('3. Update the load endpoint in your server'));
-        console.log(chalk.gray('4. Add change event handlers if needed'));
-        console.log(chalk.gray('5. Customize the views and context as needed'));
+      console.log(chalk.gray("2. Customize the page content"));
+      if (options.type === "dashboard") {
+        console.log(chalk.gray("3. Update the load endpoint in your server"));
+        console.log(chalk.gray("4. Add change event handlers if needed"));
+        console.log(chalk.gray("5. Customize the views and context as needed"));
       }
-
     } catch (error) {
-      spinner.fail('Page creation failed');
-      console.error(chalk.red('Error:'), error);
+      spinner.fail("Page creation failed");
+      console.error(chalk.red("Error:"), error);
       process.exit(1);
     }
   });
 
 async function createStaticPageFlow(name: string, spinner: any) {
   // Step 1: Create static HTML page based on template/src/client/index.html
-  spinner.start('Creating static HTML page...');
-  
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-  
+  spinner.start("Creating static HTML page...");
+
+  const capitalizedName = toPascalCase(name);
+
   const staticHtml = `<!doctype html>
 <html lang="en">
   <head>
@@ -317,20 +544,28 @@ async function createStaticPageFlow(name: string, spinner: any) {
 </html>`;
 
   await fs.outputFile(`src/client/${name}/index.html`, staticHtml);
-  spinner.succeed('Created static HTML page');
+  spinner.succeed("Created static HTML page");
 
   // Step 2: Update vite.config.ts
-  spinner.start('Updating vite.config.ts...');
+  spinner.start("Updating vite.config.ts...");
   await updateViteConfig(name);
-  spinner.succeed('Updated vite.config.ts');
+  spinner.succeed("Updated vite.config.ts");
 }
 
-async function createDashboardPageFlow(name: string, spinner: any, schemasPath: string, routesPath: string, userShardPath: string) {
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-  
+async function createDashboardPageFlow(
+  name: string,
+  spinner: any,
+  schemasPath: string,
+  routesPath: string,
+  userShardPath: string
+) {
+  const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
+  const snakeName = toScreamingSnakeCase(name);
+
   // Step 1: Create index.html (simple like dashboard)
-  spinner.start('Creating dashboard page structure...');
-  
+  spinner.start("Creating dashboard page structure...");
+
   const indexHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -386,7 +621,7 @@ import { buildingStorefront } from "solid-heroicons/solid";
 import { arrowRightOnRectangle } from "solid-heroicons/outline";
 import OverviewView from "./OverviewView";
 import SettingsView from "./SettingsView";
-import { ${name}ApiClient } from "./${capitalizedName}ApiClient";
+import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
 
 const authClient = createAuthClient({
   baseURL: window.location.origin,
@@ -432,8 +667,8 @@ function ${capitalizedName}Skeleton() {
 }
 
 function ${capitalizedName}Content() {
-  const ${name.toLowerCase()} = use${capitalizedName}();
-  const { store, actions } = ${name.toLowerCase()};
+  const ${camelName} = use${capitalizedName}();
+  const { store, actions } = ${camelName};
   
   const session = authClient.useSession();
 
@@ -559,9 +794,9 @@ function ${capitalizedName}Content() {
 
 export default function ${capitalizedName}() {
   // Load dashboard data using createResource
-  const [${name}Data] = createResource(async () => {
+  const [${camelName}Data] = createResource(async () => {
     try {
-      const data = await ${name}ApiClient.load${capitalizedName}();
+      const data = await ${camelName}ApiClient.load${capitalizedName}();
       console.log("${capitalizedName} data:", data);
       return data;
     } catch (error) {
@@ -574,7 +809,7 @@ export default function ${capitalizedName}() {
 
   return (
     <Show
-      when={session() && !session().isPending && !${name}Data.loading}
+      when={session() && !session().isPending && !${camelName}Data.loading}
       fallback={<${capitalizedName}Skeleton />}
     >
       <Show
@@ -589,7 +824,7 @@ export default function ${capitalizedName}() {
         }
       >
         <${capitalizedName}Provider
-          initialData={${name}Data()!}
+          initialData={${camelName}Data()!}
           user={session()!.data!.user!}
         >
           <${capitalizedName}Content />
@@ -599,21 +834,27 @@ export default function ${capitalizedName}() {
   );
 }`;
 
-  await fs.outputFile(`src/client/${name}/${capitalizedName}.tsx`, mainComponent);
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}.tsx`,
+    mainComponent
+  );
 
   // Add missing import for For
   const mainComponentWithImport = mainComponent.replace(
     'import {\n  Show,\n  Switch,\n  Match,\n  createResource,\n} from "solid-js";',
     'import {\n  For,\n  Show,\n  Switch,\n  Match,\n  createResource,\n} from "solid-js";'
   );
-  
-  await fs.outputFile(`src/client/${name}/${capitalizedName}.tsx`, mainComponentWithImport);
 
-  spinner.succeed('Created main component');
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}.tsx`,
+    mainComponentWithImport
+  );
+
+  spinner.succeed("Created main component");
 
   // Continue with other files...
-  spinner.start('Creating context and views...');
-  
+  spinner.start("Creating context and views...");
+
   // Step 4: Create Context (simplified version of DashboardContext)
   const contextFile = `import {
   createContext,
@@ -628,17 +869,17 @@ export default function ${capitalizedName}() {
 import { createStore, type SetStoreFunction } from "solid-js/store";
 import { ${capitalizedName}AutosaveService } from "./${capitalizedName}AutosaveService";
 import { ${capitalizedName}UndoRedoService } from "./${capitalizedName}UndoRedoService";
-import type { ${capitalizedName}Event } from "@shared/types/${name}Events";
+import type { ${capitalizedName}Event } from "@shared/types/${camelName}Events";
 import type { User } from "better-auth";
-import { process${capitalizedName}EventQueue } from "./${name}EventProcessor";
-import { ${name}ApiClient } from "./${capitalizedName}ApiClient";
+import { process${capitalizedName}EventQueue } from "./${camelName}EventProcessor";
+import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
 
 export interface ${capitalizedName}Store {
   // User data
   user: User;
 
   // Current view
-  currentView: "${name.toLowerCase()}" | "overview" | "settings";
+  currentView: "${camelName}" | "overview" | "settings";
 
   // UI state
   isLoading: boolean;
@@ -715,12 +956,15 @@ export function use${capitalizedName}() {
   return context;
 }`;
 
-  await fs.outputFile(`src/client/${name}/${capitalizedName}Context.tsx`, contextFile);
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}Context.tsx`,
+    contextFile
+  );
 
   // Step 5: Create event processor
   const eventProcessor = `import type { SetStoreFunction } from "solid-js/store";
 import type { ${capitalizedName}Store } from "./${capitalizedName}Context";
-import type { ${capitalizedName}Event } from "@shared/types/${name}Events";
+import type { ${capitalizedName}Event } from "@shared/types/${camelName}Events";
 
 export function process${capitalizedName}EventQueue(
   events: ${capitalizedName}Event[],
@@ -744,14 +988,17 @@ export function process${capitalizedName}Event(
   }
 }`;
 
-  await fs.outputFile(`src/client/${name}/${name}EventProcessor.ts`, eventProcessor);
+  await fs.outputFile(
+    `src/client/${name}/${camelName}EventProcessor.ts`,
+    eventProcessor
+  );
 
   // Step 6: Create basic views
   const overviewView = `import { Component } from "solid-js";
 import { use${capitalizedName} } from "./${capitalizedName}Context";
 
 const OverviewView: Component = () => {
-  const { store } = use${capitalizedName}();
+  const { store, actions } = use${capitalizedName}();
 
   return (
     <div class="space-y-6">
@@ -791,8 +1038,6 @@ export default OverviewView;`;
   const settingsView = `import { Component } from "solid-js";
 import { use${capitalizedName} } from "./${capitalizedName}Context";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 
 const SettingsView: Component = () => {
   const { store, actions } = use${capitalizedName}();
@@ -809,20 +1054,22 @@ const SettingsView: Component = () => {
       <div class="card p-6 space-y-4">
         <h3 class="text-lg font-semibold">General Settings</h3>
         
-        <div class="space-y-2">
-          <Label for="setting1">Sample Setting</Label>
-          <Input
-            id="setting1"
-            placeholder="Enter value..."
-          />
-        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Sample Setting</label>
+            <input
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter value..."
+            />
+          </div>
 
-        <div class="space-y-2">
-          <Label for="setting2">Another Setting</Label>
-          <Input
-            id="setting2"
-            placeholder="Enter another value..."
-          />
+          <div>
+            <label class="block text-sm font-medium mb-1">Another Setting</label>
+            <input
+              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter another value..."
+            />
+          </div>
         </div>
 
         <Button>Save Settings</Button>
@@ -835,29 +1082,32 @@ export default SettingsView;`;
 
   await fs.outputFile(`src/client/${name}/SettingsView.tsx`, settingsView);
 
-  spinner.succeed('Created context, event processor, and views');
+  spinner.succeed("Created context, event processor, and views");
 
   // Step 7: Update vite.config.ts
-  spinner.start('Updating vite.config.ts...');
+  spinner.start("Updating vite.config.ts...");
   await updateViteConfig(name);
-  spinner.succeed('Updated vite.config.ts');
+  spinner.succeed("Updated vite.config.ts");
 
   // Step 8: Create ApiClient file and append types to schemas
-  spinner.start('Creating API client and updating types...');
-  
+  spinner.start("Creating API client and updating types...");
+
   // Calculate relative import path from the API client location to the schemas file
   const apiClientPath = `src/client/${name}/${capitalizedName}ApiClient.ts`;
-  const relativeImportPath = path.relative(
-    path.dirname(apiClientPath),
-    schemasPath.replace(/\.ts$/, '')
-  ).replace(/\\/g, '/');
-  
+  const relativeImportPath = path
+    .relative(path.dirname(apiClientPath), schemasPath.replace(/\.ts$/, ""))
+    .replace(/\\/g, "/");
+
   const apiClientFile = `import type { 
   Load${capitalizedName}Response, 
   Load${capitalizedName}Request,
   Save${capitalizedName}Request, 
   Save${capitalizedName}Response 
-} from "${relativeImportPath.startsWith('.') ? relativeImportPath : './' + relativeImportPath}";
+} from "${
+    relativeImportPath.startsWith(".")
+      ? relativeImportPath
+      : "./" + relativeImportPath
+  }";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
@@ -888,10 +1138,13 @@ class ${capitalizedName}ApiClient {
   }
 }
 
-export const ${name}ApiClient = new ${capitalizedName}ApiClient();`;
+export const ${camelName}ApiClient = new ${capitalizedName}ApiClient();`;
 
-  await fs.outputFile(`src/client/${name}/${capitalizedName}ApiClient.ts`, apiClientFile);
-  
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}ApiClient.ts`,
+    apiClientFile
+  );
+
   // Append types to schemas file
   const typesToAppend = `
 // ${capitalizedName} API Types
@@ -921,10 +1174,10 @@ export type Save${capitalizedName}Request = z.infer<typeof Save${capitalizedName
 export type Save${capitalizedName}Response = z.infer<typeof Save${capitalizedName}ResponseSchema>;`;
 
   if (await fs.pathExists(schemasPath)) {
-    const existingContent = await fs.readFile(schemasPath, 'utf8');
+    const existingContent = await fs.readFile(schemasPath, "utf8");
     const updatedContent = existingContent + typesToAppend;
     await fs.writeFile(schemasPath, updatedContent);
-    spinner.text = 'Created API client and updated schemas';
+    spinner.text = "Created API client and updated schemas";
   } else {
     // Create the schemas file if it doesn't exist
     const schemasContent = `import { z } from "zod";
@@ -937,23 +1190,26 @@ export const ErrorResponseSchema = z.object({
 
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 ${typesToAppend}`;
-    
+
     await fs.outputFile(schemasPath, schemasContent);
-    spinner.text = 'Created API client and schemas file';
+    spinner.text = "Created API client and schemas file";
   }
-  
-  spinner.succeed('Created API client and updated types');
+
+  spinner.succeed("Created API client and updated types");
 
   // Step 9: Create AutosaveService
-  spinner.start('Creating AutosaveService...');
-  
+  spinner.start("Creating AutosaveService...");
+
   const autosaveService = `import type { Change } from '@shared/types/events';
-import { ${name}ApiClient } from './${capitalizedName}ApiClient';
+import { ${camelName}ApiClient } from './${capitalizedName}ApiClient';
 
 export class ${capitalizedName}AutosaveService {
   private changeQueue: Change[] = [];
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
-  private readonly DEBOUNCE_MS = 1000;
+
+  // This is the debounce time of saves on this page. If this page has lots of simultaneous changes, you can increase this.
+  // If the page doesn't ofter have lots of simultaneous changes, you can decrease this.
+  private readonly DEBOUNCE_MS = 10;
 
   queueChange(change: Change) {
     this.changeQueue.push(change);
@@ -977,7 +1233,7 @@ export class ${capitalizedName}AutosaveService {
     this.changeQueue = [];
 
     try {
-      await ${name}ApiClient.save${capitalizedName}(changes);
+      await ${camelName}ApiClient.save${capitalizedName}(changes);
     } catch (error) {
       console.error('Failed to save changes:', error);
       // Re-add changes to queue on failure
@@ -993,12 +1249,15 @@ export class ${capitalizedName}AutosaveService {
   }
 }`;
 
-  await fs.outputFile(`src/client/${name}/${capitalizedName}AutosaveService.ts`, autosaveService);
-  spinner.succeed('Created AutosaveService');
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}AutosaveService.ts`,
+    autosaveService
+  );
+  spinner.succeed("Created AutosaveService");
 
   // Step 10: Create UndoRedoService
-  spinner.start('Creating UndoRedoService...');
-  
+  spinner.start("Creating UndoRedoService...");
+
   const undoRedoService = `interface Action {
   undo: () => void;
   redo: () => void;
@@ -1057,8 +1316,11 @@ export class ${capitalizedName}UndoRedoService {
   }
 }`;
 
-  await fs.outputFile(`src/client/${name}/${capitalizedName}UndoRedoService.ts`, undoRedoService);
-  spinner.succeed('Created UndoRedoService');
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}UndoRedoService.ts`,
+    undoRedoService
+  );
+  spinner.succeed("Created UndoRedoService");
 
   // Step 11: Add routes to index.ts
   await addRoutesToIndex(name, routesPath, spinner);
@@ -1070,16 +1332,19 @@ export class ${capitalizedName}UndoRedoService {
   await createEventsFile(name, spinner);
 
   // Step 14: Update vite.config.ts
-  spinner.start('Updating vite.config.ts...');
+  spinner.start("Updating vite.config.ts...");
   await updateViteConfig(name);
-  spinner.succeed('Updated vite.config.ts');
+  spinner.succeed("Updated vite.config.ts");
 
   // Step 12: Create load endpoint info
-  spinner.start('Creating API integration info...');
-  
-  console.log(chalk.yellow('\n📋 Add these to your server:'));
-  console.log(chalk.gray('1. Add to your load endpoint (src/server/api/load.ts):'));
-  console.log(chalk.cyan(`
+  spinner.start("Creating API integration info...");
+
+  console.log(chalk.yellow("\n📋 Add these to your server:"));
+  console.log(
+    chalk.gray("1. Add to your load endpoint (src/server/api/load.ts):")
+  );
+  console.log(
+    chalk.cyan(`
 app.get("/api/${name}/load", authMiddleware, async (c) => {
   const userId = c.get("userId");
   
@@ -1089,10 +1354,12 @@ app.get("/api/${name}/load", authMiddleware, async (c) => {
   };
   
   return c.json(data);
-});`));
+});`)
+  );
 
-  console.log(chalk.gray('2. Add save endpoint (src/server/api/save.ts):'));
-  console.log(chalk.cyan(`
+  console.log(chalk.gray("2. Add save endpoint (src/server/api/save.ts):"));
+  console.log(
+    chalk.cyan(`
 app.post("/api/${name}/save", authMiddleware, async (c) => {
   const userId = c.get("userId");
   const { changes } = await c.req.json();
@@ -1105,50 +1372,65 @@ app.post("/api/${name}/save", authMiddleware, async (c) => {
   }
   
   return c.json({ success: true });
-});`));
+});`)
+  );
 
-  console.log(chalk.gray('3. Add event types to @shared/types/events.ts:'));
-  console.log(chalk.cyan(`
+  console.log(chalk.gray("3. Add event types to @shared/types/events.ts:"));
+  console.log(
+    chalk.cyan(`
 export type ${capitalizedName}Event = {
   type: "SAMPLE_EVENT";
   // Add your event properties
 };
 
-export type Change = ${capitalizedName}Event | OtherEvent;`));
-  
-  spinner.succeed('API integration info created');
+export type Change = ${capitalizedName}Event | OtherEvent;`)
+  );
+
+  spinner.succeed("API integration info created");
 }
 
-async function addRoutesToIndex(name: string, routesPath: string, spinner: any) {
-  spinner.start('Adding routes to index.ts...');
-  
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-  
+async function addRoutesToIndex(
+  name: string,
+  routesPath: string,
+  spinner: any
+) {
+  spinner.start("Adding routes to index.ts...");
+
+  const capitalizedName = toPascalCase(name);
+
   if (!(await fs.pathExists(routesPath))) {
-    spinner.warn(`Routes file not found at ${routesPath}, skipping route generation`);
+    spinner.warn(
+      `Routes file not found at ${routesPath}, skipping route generation`
+    );
     return;
   }
 
-  const routesContent = await fs.readFile(routesPath, 'utf8');
-  
+  const routesContent = await fs.readFile(routesPath, "utf8");
+
   // Check if we need to add imports
   let updatedContent = routesContent;
-  
+
   // Add schema imports if not present
   if (!routesContent.includes(`Load${capitalizedName}ResponseSchema`)) {
-    const importMatch = routesContent.match(/import {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/);
+    const importMatch = routesContent.match(
+      /import {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+    );
     if (importMatch) {
-      const existingImports = importMatch[1];
-      const newImports = `${existingImports.trim()},
+      const existingImports = importMatch[1].trim();
+      // Remove any trailing commas and clean up
+      const cleanedImports = existingImports.replace(/,\s*$/, "");
+      const newImports = `${cleanedImports},
   Load${capitalizedName}ResponseSchema,
   Save${capitalizedName}RequestSchema,
   Save${capitalizedName}ResponseSchema`;
-      updatedContent = updatedContent.replace(importMatch[0], 
+      updatedContent = updatedContent.replace(
+        importMatch[0],
         `import {${newImports}
-} from "@shared/types/request-response-schemas";`);
+} from "@shared/types/request-response-schemas";`
+      );
     } else {
       // Add new import if none exists
-      const firstImportIndex = updatedContent.indexOf('import');
+      const firstImportIndex = updatedContent.indexOf("import");
       if (firstImportIndex !== -1) {
         const importToAdd = `import {
   Load${capitalizedName}ResponseSchema,
@@ -1156,7 +1438,10 @@ async function addRoutesToIndex(name: string, routesPath: string, spinner: any) 
   Save${capitalizedName}ResponseSchema,
 } from "@shared/types/request-response-schemas";
 `;
-        updatedContent = updatedContent.slice(0, firstImportIndex) + importToAdd + updatedContent.slice(firstImportIndex);
+        updatedContent =
+          updatedContent.slice(0, firstImportIndex) +
+          importToAdd +
+          updatedContent.slice(firstImportIndex);
       }
     }
   }
@@ -1173,7 +1458,7 @@ app.get("/api/${name}/load", async (c) => {
   const shardId = c.env.USER_SHARD.idFromName(user.id);
   const userShard = c.env.USER_SHARD.get(shardId);
 
-  const result = await userShard.load${capitalizedName}();
+  const result = await userShard.load${capitalizedName}(user.id);
 
   if ("error" in result) {
     return sendError(c, 500, result.error);
@@ -1197,7 +1482,7 @@ app.post(
       const shardId = c.env.USER_SHARD.idFromName(user.id);
       const userShard = c.env.USER_SHARD.get(shardId);
 
-      const result = await userShard.save${capitalizedName}(changes as Change[]);
+      const result = await userShard.save${capitalizedName}(user.id, changes as Change[]);
       if ("error" in result) {
         return sendError(c, result.statusCode as any, result.error);
       }
@@ -1211,51 +1496,77 @@ app.post(
 );
 `;
 
-  // Find the export default line and add routes before it
-  const exportDefaultIndex = updatedContent.lastIndexOf('export default');
-  if (exportDefaultIndex !== -1) {
-    updatedContent = updatedContent.slice(0, exportDefaultIndex) + routesToAdd + '\n' + updatedContent.slice(exportDefaultIndex);
+  // Find the 404 catchall route and add routes before it
+  const catchallIndex = updatedContent.indexOf('app.get("*"');
+  if (catchallIndex !== -1) {
+    updatedContent =
+      updatedContent.slice(0, catchallIndex) +
+      routesToAdd +
+      "\n" +
+      updatedContent.slice(catchallIndex);
   } else {
-    // If no export default, add at the end
-    updatedContent += routesToAdd;
+    // If no catchall found, find export default and add before it
+    const exportDefaultIndex = updatedContent.lastIndexOf("export default");
+    if (exportDefaultIndex !== -1) {
+      updatedContent =
+        updatedContent.slice(0, exportDefaultIndex) +
+        routesToAdd +
+        "\n" +
+        updatedContent.slice(exportDefaultIndex);
+    } else {
+      // If no export default, add at the end
+      updatedContent += routesToAdd;
+    }
   }
 
   await fs.writeFile(routesPath, updatedContent);
-  spinner.succeed('Added routes to index.ts');
+  spinner.succeed("Added routes to index.ts");
 }
 
-async function addUserShardFunctions(name: string, userShardPath: string, spinner: any) {
-  spinner.start('Adding UserShard functions...');
-  
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-  
+async function addUserShardFunctions(
+  name: string,
+  userShardPath: string,
+  spinner: any
+) {
+  spinner.start("Adding UserShard functions...");
+
+  const capitalizedName = toPascalCase(name);
+
   if (!(await fs.pathExists(userShardPath))) {
-    spinner.warn(`UserShard file not found at ${userShardPath}, skipping UserShard generation`);
+    spinner.warn(
+      `UserShard file not found at ${userShardPath}, skipping UserShard generation`
+    );
     return;
   }
 
-  const userShardContent = await fs.readFile(userShardPath, 'utf8');
-  
+  const userShardContent = await fs.readFile(userShardPath, "utf8");
+
   // Add type imports if not present
   let updatedContent = userShardContent;
-  
+
   if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
     // Find the import block for request-response-schemas and add our types
-    const importMatch = updatedContent.match(/import type {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/);
+    const importMatch = updatedContent.match(
+      /import type {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+    );
     if (importMatch) {
-      const existingImports = importMatch[1];
-      const newImports = `${existingImports.trim()},
+      const existingImports = importMatch[1].trim();
+      // Remove any trailing commas and clean up
+      const cleanedImports = existingImports.replace(/,\s*$/, "");
+      const newImports = `${cleanedImports},
   Load${capitalizedName}Response,
   Save${capitalizedName}Response`;
-      updatedContent = updatedContent.replace(importMatch[0], 
+      updatedContent = updatedContent.replace(
+        importMatch[0],
         `import type {${newImports}
-} from "@shared/types/request-response-schemas";`);
+} from "@shared/types/request-response-schemas";`
+      );
     }
   }
 
   // Add the load and save functions before the closing brace of the class
   const functionsToAdd = `
-  async load${capitalizedName}(): Promise<Load${capitalizedName}Response | ErrorResponse> {
+  async load${capitalizedName}(userId: string): Promise<Load${capitalizedName}Response | ErrorResponse> {
     try {
       // TODO: Implement load logic for ${name}
       // Example: Query your schema tables and return data
@@ -1278,6 +1589,7 @@ async function addUserShardFunctions(name: string, userShardPath: string, spinne
   }
 
   async save${capitalizedName}(
+    userId: string,
     changes: Change[]
   ): Promise<Save${capitalizedName}Response | ErrorResponse> {
     try {
@@ -1312,26 +1624,32 @@ async function addUserShardFunctions(name: string, userShardPath: string, spinne
 `;
 
   // Find the last method in the class and add our functions before the closing brace
-  const lastBraceIndex = updatedContent.lastIndexOf('}');
+  const lastBraceIndex = updatedContent.lastIndexOf("}");
   if (lastBraceIndex !== -1) {
-    updatedContent = updatedContent.slice(0, lastBraceIndex) + functionsToAdd + '\n' + updatedContent.slice(lastBraceIndex);
+    updatedContent =
+      updatedContent.slice(0, lastBraceIndex) +
+      functionsToAdd +
+      "\n" +
+      updatedContent.slice(lastBraceIndex);
   }
 
   await fs.writeFile(userShardPath, updatedContent);
-  spinner.succeed('Added UserShard functions');
+  spinner.succeed("Added UserShard functions");
 }
 
 async function createEventsFile(name: string, spinner: any) {
-  spinner.start('Creating events file...');
-  
-  const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-  
+  spinner.start("Creating events file...");
+
+  const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
+  const snakeName = toScreamingSnakeCase(name);
+
   const eventsContent = `import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 import type * as schema from "~/durable-objects/user-shard/schema";
 
 export type Base${capitalizedName}Event =
   | {
-      type: "SAMPLE_${name.toUpperCase()}_EVENT";
+      type: "SAMPLE_${snakeName}_EVENT";
       sampleData: string;
       previousValue?: string;
       newValue: string;
@@ -1372,6 +1690,6 @@ export type ChangeHandler<T extends Change = Change> = (
 export type AssertNever = (x: never) => never;
 `;
 
-  await fs.outputFile(`shared/types/${name}Events.ts`, eventsContent);
-  spinner.succeed('Created events file');
+  await fs.outputFile(`shared/types/${camelName}Events.ts`, eventsContent);
+  spinner.succeed("Created events file");
 }
