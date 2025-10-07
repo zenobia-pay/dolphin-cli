@@ -99,7 +99,7 @@ export const initCommand = new Command('init')
 
       // Install dependencies
       spinner.start('Installing dependencies...');
-      await execa('npm', ['install']);
+      await execa('pnpm', ['install']);
       spinner.succeed('Installed dependencies');
 
       console.log(chalk.green.bold(`\n✅ Project "${dirName}" initialized successfully!\n`));

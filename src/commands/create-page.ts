@@ -592,6 +592,7 @@ render(() => <${capitalizedName} />, document.getElementById("root")!);`;
 
   // Step 3: Create skeleton component
   const mainComponent = `import {
+  For,
   Show,
   Switch,
   Match,
@@ -616,11 +617,10 @@ import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Icon } from "solid-heroicons";
 import { buildingStorefront } from "solid-heroicons/solid";
 import { arrowRightOnRectangle } from "solid-heroicons/outline";
-import OverviewView from "./OverviewView";
-import SettingsView from "./SettingsView";
 import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
 
 const authClient = createAuthClient({
@@ -666,10 +666,131 @@ function ${capitalizedName}Skeleton() {
   );
 }
 
+// TODO: Rename this component and replace with your actual content
+function ViewOne() {
+  const { store } = use${capitalizedName}();
+
+  return (
+    <div class="space-y-6">
+      {/* TODO: Replace this placeholder content */}
+      <div>
+        <h2 class="text-3xl font-bold tracking-tight">Lorem Ipsum</h2>
+        <p class="text-muted-foreground">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        </p>
+      </div>
+
+      {/* TODO: Replace these placeholder cards */}
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">
+              Placeholder Title
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">123</div>
+            <p class="text-xs text-muted-foreground">
+              Lorem ipsum dolor sit
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">
+              Placeholder Title
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">456</div>
+            <p class="text-xs text-muted-foreground">
+              Consectetur adipiscing
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">
+              Placeholder Title
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">789</div>
+            <p class="text-xs text-muted-foreground">
+              Sed do eiusmod tempor
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">
+              Placeholder Title
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-bold">101</div>
+            <p class="text-xs text-muted-foreground">
+              Incididunt ut labore
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* TODO: Replace this placeholder content card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Placeholder Content</CardTitle>
+          <CardDescription>
+            Replace this with your actual content
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p class="text-sm text-muted-foreground">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+            nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// TODO: Rename this component and replace with your actual content
+function ViewTwo() {
+  const { store } = use${capitalizedName}();
+
+  return (
+    <div class="space-y-6">
+      {/* TODO: Replace this placeholder content */}
+      <div>
+        <h2 class="text-3xl font-bold tracking-tight">Lorem Ipsum</h2>
+        <p class="text-muted-foreground">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Placeholder Content</CardTitle>
+          <CardDescription>
+            Replace this with your actual content
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p class="text-sm text-muted-foreground">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function ${capitalizedName}Content() {
   const ${camelName} = use${capitalizedName}();
   const { store, actions } = ${camelName};
-  
+
   const session = authClient.useSession();
 
   const logout = async () => {
@@ -682,8 +803,8 @@ function ${capitalizedName}Content() {
   };
 
   const sidebarItems = [
-    { id: "overview", label: "Overview" },
-    { id: "settings", label: "Settings" },
+    { id: "view-one", label: "View One" },
+    { id: "view-two", label: "View Two" },
   ] as const;
 
   return (
@@ -776,12 +897,12 @@ function ${capitalizedName}Content() {
 
           <div class="p-6">
             <Show when={!store.isLoading}>
-              <Switch fallback={<OverviewView />}>
-                <Match when={store.currentView === "overview"}>
-                  <OverviewView />
+              <Switch fallback={<ViewOne />}>
+                <Match when={store.currentView === "view-one"}>
+                  <ViewOne />
                 </Match>
-                <Match when={store.currentView === "settings"}>
-                  <SettingsView />
+                <Match when={store.currentView === "view-two"}>
+                  <ViewTwo />
                 </Match>
               </Switch>
             </Show>
@@ -839,15 +960,9 @@ export default function ${capitalizedName}() {
     mainComponent
   );
 
-  // Add missing import for For
-  const mainComponentWithImport = mainComponent.replace(
-    'import {\n  Show,\n  Switch,\n  Match,\n  createResource,\n} from "solid-js";',
-    'import {\n  For,\n  Show,\n  Switch,\n  Match,\n  createResource,\n} from "solid-js";'
-  );
-
   await fs.outputFile(
     `src/client/${name}/${capitalizedName}.tsx`,
-    mainComponentWithImport
+    mainComponent
   );
 
   spinner.succeed("Created main component");
@@ -865,28 +980,29 @@ export default function ${capitalizedName}() {
   createSignal,
   createEffect,
   on,
+  JSX,
 } from "solid-js";
 import { createStore, type SetStoreFunction } from "solid-js/store";
 import { ${capitalizedName}AutosaveService } from "./${capitalizedName}AutosaveService";
 import { ${capitalizedName}UndoRedoService } from "./${capitalizedName}UndoRedoService";
 import type { ${capitalizedName}Event } from "@shared/types/${camelName}Events";
 import type { User } from "better-auth";
-import { process${capitalizedName}EventQueue } from "./${camelName}EventProcessor";
+// Import database types like this:
+// import type { User as UserSchema } from "@shared/types/primitives";
+import { process${capitalizedName}EventQueue, process${capitalizedName}EventResultQueue } from "./${camelName}EventProcessor";
 import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
+import { Load${capitalizedName}Response } from "@shared/types/request-response-schemas";
 
 export interface ${capitalizedName}Store {
   // User data
   user: User;
 
-  // Current view
-  currentView: "${camelName}" | "overview" | "settings";
-
   // UI state
+  currentView: "view-one" | "view-two";
   isLoading: boolean;
   error: string | null;
 
-  // Add your specific store properties here
-  data: any;
+  loadedData: Load${capitalizedName}Response;
 }
 
 export interface ${capitalizedName}Actions {
@@ -905,31 +1021,37 @@ interface ${capitalizedName}ContextType {
 const ${capitalizedName}Context = createContext<${capitalizedName}ContextType>();
 
 export function ${capitalizedName}Provider(props: {
-  children: any;
-  initialData: any;
+  children: JSX.Element;
+  initialData: Load${capitalizedName}Response;
   user: User;
 }) {
   const [store, setStore] = createStore<${capitalizedName}Store>({
     user: props.user,
-    currentView: "overview",
+    currentView: "view-one",
     isLoading: false,
     error: null,
-    data: props.initialData,
+
+    loadedData: props.initialData,
   });
 
   // Initialize services
   const autosave = new ${capitalizedName}AutosaveService();
   const undoRedo = new ${capitalizedName}UndoRedoService();
 
+  // Initialize autosave with store and result processor
+  autosave.initialize(store, setStore, (results) => {
+    process${capitalizedName}EventResultQueue(results, store, setStore);
+  });
+
   const actions: ${capitalizedName}Actions = {
     setCurrentView: (view) => setStore("currentView", view),
   };
 
   const emitEvent = (event: ${capitalizedName}Event) => {
-    // Queue for autosave
-    autosave.queueChange(event as any);
-    
-    // Process locally
+    // Queue for autosave (sends to server)
+    autosave.queueEvent(event);
+
+    // Process locally for optimistic UI updates
     process${capitalizedName}EventQueue([event], store, setStore);
   };
 
@@ -964,7 +1086,7 @@ export function use${capitalizedName}() {
   // Step 5: Create event processor
   const eventProcessor = `import type { SetStoreFunction } from "solid-js/store";
 import type { ${capitalizedName}Store } from "./${capitalizedName}Context";
-import type { ${capitalizedName}Event } from "@shared/types/${camelName}Events";
+import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from "@shared/types/${camelName}Events";
 
 export function process${capitalizedName}EventQueue(
   events: ${capitalizedName}Event[],
@@ -982,9 +1104,42 @@ export function process${capitalizedName}Event(
   setStore: SetStoreFunction<${capitalizedName}Store>
 ) {
   switch (event.type) {
-    // Add your event handlers here
+    case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
+      // TODO: Add optimistic UI update logic here
+      // Example: setStore("data", "someField", event.newValue);
+      break;
+    }
     default:
       console.warn("Unknown ${name} event type:", event);
+  }
+}
+
+export function process${capitalizedName}EventResultQueue(
+  results: ${capitalizedName}EventResult[],
+  store: ${capitalizedName}Store,
+  setStore: SetStoreFunction<${capitalizedName}Store>
+) {
+  for (const result of results) {
+    process${capitalizedName}EventResult(result, store, setStore);
+  }
+}
+
+export function process${capitalizedName}EventResult(
+  result: ${capitalizedName}EventResult,
+  store: ${capitalizedName}Store,
+  setStore: SetStoreFunction<${capitalizedName}Store>
+) {
+  switch (result.type) {
+    case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
+      // TODO: Process server response here
+      // Example: Update UI with server-generated IDs or confirmations
+      // setStore("data", "items", (items) => items.map(item =>
+      //   item.tempId === result.tempId ? { ...item, id: result.id } : item
+      // ));
+      break;
+    }
+    default:
+      console.warn("Unknown ${name} event result type:", result);
   }
 }`;
 
@@ -993,94 +1148,6 @@ export function process${capitalizedName}Event(
     eventProcessor
   );
 
-  // Step 6: Create basic views
-  const overviewView = `import { Component } from "solid-js";
-import { use${capitalizedName} } from "./${capitalizedName}Context";
-
-const OverviewView: Component = () => {
-  const { store, actions } = use${capitalizedName}();
-
-  return (
-    <div class="space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold">${capitalizedName} Overview</h2>
-        <p class="text-muted-foreground">
-          Welcome to your ${name} dashboard.
-        </p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="card p-6">
-          <h3 class="text-lg font-semibold mb-2">Sample Metric</h3>
-          <p class="text-3xl font-bold">42</p>
-          <p class="text-sm text-muted-foreground">Sample description</p>
-        </div>
-        
-        <div class="card p-6">
-          <h3 class="text-lg font-semibold mb-2">Another Metric</h3>
-          <p class="text-3xl font-bold">128</p>
-          <p class="text-sm text-muted-foreground">Another description</p>
-        </div>
-      </div>
-
-      <div class="card p-6">
-        <h3 class="text-lg font-semibold mb-4">Recent Activity</h3>
-        <p class="text-muted-foreground">No recent activity to display.</p>
-      </div>
-    </div>
-  );
-};
-
-export default OverviewView;`;
-
-  await fs.outputFile(`src/client/${name}/OverviewView.tsx`, overviewView);
-
-  const settingsView = `import { Component } from "solid-js";
-import { use${capitalizedName} } from "./${capitalizedName}Context";
-import { Button } from "~/components/ui/button";
-
-const SettingsView: Component = () => {
-  const { store, actions } = use${capitalizedName}();
-
-  return (
-    <div class="space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold">${capitalizedName} Settings</h2>
-        <p class="text-muted-foreground">
-          Configure your ${name} preferences.
-        </p>
-      </div>
-
-      <div class="card p-6 space-y-4">
-        <h3 class="text-lg font-semibold">General Settings</h3>
-        
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">Sample Setting</label>
-            <input
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter value..."
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1">Another Setting</label>
-            <input
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter another value..."
-            />
-          </div>
-        </div>
-
-        <Button>Save Settings</Button>
-      </div>
-    </div>
-  );
-};
-
-export default SettingsView;`;
-
-  await fs.outputFile(`src/client/${name}/SettingsView.tsx`, settingsView);
 
   spinner.succeed("Created context, event processor, and views");
 
@@ -1098,11 +1165,11 @@ export default SettingsView;`;
     .relative(path.dirname(apiClientPath), schemasPath.replace(/\.ts$/, ""))
     .replace(/\\/g, "/");
 
-  const apiClientFile = `import type { 
-  Load${capitalizedName}Response, 
+  const apiClientFile = `import type {
+  Load${capitalizedName}Response,
   Load${capitalizedName}Request,
-  Save${capitalizedName}Request, 
-  Save${capitalizedName}Response 
+  Save${capitalizedName}Request,
+  Save${capitalizedName}Response
 } from "${
     relativeImportPath.startsWith(".")
       ? relativeImportPath
@@ -1124,12 +1191,12 @@ class ${capitalizedName}ApiClient {
   }
 
   async save${capitalizedName}(
-    changes: Save${capitalizedName}Request["changes"]
+    request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
     const response = await fetch(\`\${this.baseUrl}/save\`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ changes }),
+      body: JSON.stringify(request),
       credentials: "include",
     });
 
@@ -1148,6 +1215,8 @@ export const ${camelName}ApiClient = new ${capitalizedName}ApiClient();`;
   // Append types to schemas file
   const typesToAppend = `
 // ${capitalizedName} API Types
+import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from "./${camelName}Events";
+
 export const Load${capitalizedName}RequestSchema = z.object({});
 
 export const Load${capitalizedName}ResponseSchema = z.object({
@@ -1156,16 +1225,14 @@ export const Load${capitalizedName}ResponseSchema = z.object({
 });
 
 export const Save${capitalizedName}RequestSchema = z.object({
-  changes: z.array(z.object({
-    type: z.string(),
-    payload: z.any(),
-  })),
+  events: z.array(z.custom<${capitalizedName}Event>()),
 });
 
 export const Save${capitalizedName}ResponseSchema = z.object({
   success: z.boolean(),
-  processedCount: z.number().optional(),
-  // Add your response properties here
+  processedCount: z.number(),
+  totalChanges: z.number(),
+  results: z.array(z.custom<${capitalizedName}EventResult>()),
 });
 
 export type Load${capitalizedName}Request = z.infer<typeof Load${capitalizedName}RequestSchema>;
@@ -1200,19 +1267,34 @@ ${typesToAppend}`;
   // Step 9: Create AutosaveService
   spinner.start("Creating AutosaveService...");
 
-  const autosaveService = `import type { Change } from '@shared/types/events';
+  const autosaveService = `import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from '@shared/types/${camelName}Events';
+import type { SetStoreFunction } from 'solid-js/store';
+import type { ${capitalizedName}Store } from './${capitalizedName}Context';
 import { ${camelName}ApiClient } from './${capitalizedName}ApiClient';
 
 export class ${capitalizedName}AutosaveService {
-  private changeQueue: Change[] = [];
+  private eventQueue: ${capitalizedName}Event[] = [];
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private store: ${capitalizedName}Store | null = null;
+  private setStore: SetStoreFunction<${capitalizedName}Store> | null = null;
+  private processResults: ((results: ${capitalizedName}EventResult[]) => void) | null = null;
 
   // This is the debounce time of saves on this page. If this page has lots of simultaneous changes, you can increase this.
   // If the page doesn't ofter have lots of simultaneous changes, you can decrease this.
   private readonly DEBOUNCE_MS = 10;
 
-  queueChange(change: Change) {
-    this.changeQueue.push(change);
+  initialize(
+    store: ${capitalizedName}Store,
+    setStore: SetStoreFunction<${capitalizedName}Store>,
+    processResults: (results: ${capitalizedName}EventResult[]) => void
+  ) {
+    this.store = store;
+    this.setStore = setStore;
+    this.processResults = processResults;
+  }
+
+  queueEvent(event: ${capitalizedName}Event) {
+    this.eventQueue.push(event);
     this.scheduleSave();
   }
 
@@ -1222,22 +1304,27 @@ export class ${capitalizedName}AutosaveService {
     }
 
     this.saveTimeout = setTimeout(() => {
-      this.flush();
+      void this.flush();
     }, this.DEBOUNCE_MS);
   }
 
   async flush() {
-    if (this.changeQueue.length === 0) return;
+    if (this.eventQueue.length === 0) return;
 
-    const changes = [...this.changeQueue];
-    this.changeQueue = [];
+    const events = [...this.eventQueue];
+    this.eventQueue = [];
 
     try {
-      await ${camelName}ApiClient.save${capitalizedName}(changes);
+      const response = await ${camelName}ApiClient.save${capitalizedName}({ events });
+
+      // Process server results
+      if (response.results && this.processResults) {
+        this.processResults(response.results);
+      }
     } catch (error) {
-      console.error('Failed to save changes:', error);
-      // Re-add changes to queue on failure
-      this.changeQueue.unshift(...changes);
+      console.error('Failed to save events:', error);
+      // Re-add events to queue on failure
+      this.eventQueue.unshift(...events);
     }
   }
 
@@ -1245,7 +1332,7 @@ export class ${capitalizedName}AutosaveService {
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
     }
-    this.flush();
+    void this.flush();
   }
 }`;
 
@@ -1410,6 +1497,33 @@ async function addRoutesToIndex(
   // Check if we need to add imports
   let updatedContent = routesContent;
 
+  // Add ContentfulStatusCode import if not present
+  if (!routesContent.includes('ContentfulStatusCode')) {
+    const contentfulImportMatch = updatedContent.match(
+      /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
+    );
+    if (!contentfulImportMatch) {
+      // Add the import after the first import statement
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import { ContentfulStatusCode } from "hono/utils/http-status";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    } else {
+      // ContentfulStatusCode might already be imported, check if it's in the list
+      const existingImports = contentfulImportMatch[1].trim();
+      if (!existingImports.includes('ContentfulStatusCode')) {
+        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+        updatedContent = updatedContent.replace(
+          contentfulImportMatch[0],
+          `import { ${newImports} } from "hono/utils/http-status";`
+        );
+      }
+    }
+  }
+
   // Add schema imports if not present
   if (!routesContent.includes(`Load${capitalizedName}ResponseSchema`)) {
     const importMatch = routesContent.match(
@@ -1477,14 +1591,14 @@ app.post(
         return sendError(c, 401, "Unauthorized");
       }
 
-      const { changes } = c.req.valid("json");
+      const { events } = c.req.valid("json");
 
       const shardId = c.env.USER_SHARD.idFromName(user.id);
       const userShard = c.env.USER_SHARD.get(shardId);
 
-      const result = await userShard.save${capitalizedName}(user.id, changes as Change[]);
+      const result = await userShard.save${capitalizedName}(user.id, events);
       if ("error" in result) {
-        return sendError(c, result.statusCode as any, result.error);
+        return sendError(c, result.statusCode as ContentfulStatusCode, result.error);
       }
 
       return send(c, Save${capitalizedName}ResponseSchema, result, 200);
@@ -1531,6 +1645,7 @@ async function addUserShardFunctions(
   spinner.start("Adding UserShard functions...");
 
   const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
 
   if (!(await fs.pathExists(userShardPath))) {
     spinner.warn(
@@ -1544,23 +1659,71 @@ async function addUserShardFunctions(
   // Add type imports if not present
   let updatedContent = userShardContent;
 
+  // Add imports from request-response-schemas
   if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
     // Find the import block for request-response-schemas and add our types
     const importMatch = updatedContent.match(
-      /import type {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+      /import (?:type )?{([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
     );
     if (importMatch) {
       const existingImports = importMatch[1].trim();
-      // Remove any trailing commas and clean up
+      // Parse existing imports to avoid duplicates
+      const existingImportsList = existingImports.split(',').map(i => i.trim());
+      const importsToAdd = [`Load${capitalizedName}Response`, `Save${capitalizedName}Response`];
+
+      // Only add ErrorResponse if not already present
+      if (!existingImportsList.includes('ErrorResponse')) {
+        importsToAdd.unshift('ErrorResponse');
+      }
+
+      // Filter out any that already exist
+      const newImportsList = importsToAdd.filter(imp => !existingImportsList.includes(imp));
+
+      if (newImportsList.length > 0) {
+        const cleanedImports = existingImports.replace(/,\s*$/, "");
+        const newImports = `${cleanedImports}, ${newImportsList.join(', ')}`;
+        updatedContent = updatedContent.replace(
+          importMatch[0],
+          `import { ${newImports} } from "@shared/types/request-response-schemas";`
+        );
+      }
+    } else {
+      // Add new import if none exists
+      const firstImportIndex = updatedContent.indexOf("import");
+      if (firstImportIndex !== -1) {
+        const importToAdd = `import { ErrorResponse, Load${capitalizedName}Response, Save${capitalizedName}Response } from "@shared/types/request-response-schemas";\n`;
+        updatedContent =
+          updatedContent.slice(0, firstImportIndex) +
+          importToAdd +
+          updatedContent.slice(firstImportIndex);
+      }
+    }
+  }
+
+  // Add imports from events file
+  if (!updatedContent.includes(`${capitalizedName}Event`)) {
+    const eventsImportMatch = updatedContent.match(
+      /import (?:type )?{([^}]+)} from ["']@shared\/types\/${camelName}Events["'];/
+    );
+    if (eventsImportMatch) {
+      const existingImports = eventsImportMatch[1].trim();
       const cleanedImports = existingImports.replace(/,\s*$/, "");
-      const newImports = `${cleanedImports},
-  Load${capitalizedName}Response,
-  Save${capitalizedName}Response`;
+      const newImports = `${cleanedImports}, ${capitalizedName}Event, ${capitalizedName}Change, ${capitalizedName}EventResult, handle${capitalizedName}Change`;
       updatedContent = updatedContent.replace(
-        importMatch[0],
-        `import type {${newImports}
-} from "@shared/types/request-response-schemas";`
+        eventsImportMatch[0],
+        `import { ${newImports} } from "@shared/types/${camelName}Events";`
       );
+    } else {
+      // Add new import after the request-response-schemas import
+      const schemasImportIndex = updatedContent.indexOf("@shared/types/request-response-schemas");
+      if (schemasImportIndex !== -1) {
+        const lineEndIndex = updatedContent.indexOf("\n", schemasImportIndex);
+        const importToAdd = `\nimport { ${capitalizedName}Event, ${capitalizedName}Change, ${capitalizedName}EventResult, handle${capitalizedName}Change } from "@shared/types/${camelName}Events";`;
+        updatedContent =
+          updatedContent.slice(0, lineEndIndex) +
+          importToAdd +
+          updatedContent.slice(lineEndIndex);
+      }
     }
   }
 
@@ -1590,27 +1753,42 @@ async function addUserShardFunctions(
 
   async save${capitalizedName}(
     userId: string,
-    changes: Change[]
+    events: ${capitalizedName}Event[]
   ): Promise<Save${capitalizedName}Response | ErrorResponse> {
     try {
+      const results: ${capitalizedName}EventResult[] = [];
       let processedCount = 0;
-      const failedChanges: Change[] = [];
 
-      for (const change of changes) {
+      for (const event of events) {
         try {
-          await handleChange(this.db, change);
-          processedCount++;
+          // Server adds persistence metadata
+          const change: ${capitalizedName}Change = {
+            ...event,
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+            description: \`\${event.type} event\`,
+          };
+
+          const result = await handle${capitalizedName}Change(
+            this.env.DB,
+            this.shardDb,
+            change
+          );
+
+          if (result.success && result.result) {
+            results.push(result.result);
+            processedCount++;
+          }
         } catch (error) {
-          console.error("Error processing change:", error, change);
-          failedChanges.push(change);
+          console.error("Error processing ${name} event:", error, event);
         }
       }
 
       return {
         success: true,
         processedCount,
-        totalChanges: changes.length,
-        ...(failedChanges.length > 0 && { failedChanges }),
+        totalChanges: events.length,
+        results,
       } as Save${capitalizedName}Response;
     } catch (error) {
       console.error("Error saving ${name}:", error);
@@ -1645,17 +1823,36 @@ async function createEventsFile(name: string, spinner: any) {
   const snakeName = toScreamingSnakeCase(name);
 
   const eventsContent = `import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-import type * as schema from "~/durable-objects/user-shard/schema";
+import type * as userShardSchema from "~/db/userShard.schema";
+import type * as schema from "~/db/schema";
 
-export type Base${capitalizedName}Event =
-  | {
-      type: "SAMPLE_${snakeName}_EVENT";
-      sampleData: string;
-      previousValue?: string;
-      newValue: string;
-    };
+// ===== EVENT TYPES (what client sends) =====
+export type Sample${capitalizedName}Event = {
+  type: "SAMPLE_${snakeName}_EVENT";
+  sampleData: string;
+  previousValue?: string;
+  newValue: string;
+};
 
-export type ${capitalizedName}Event = Base${capitalizedName}Event;
+export type ${capitalizedName}Event = Sample${capitalizedName}Event;
+
+// ===== RESPONSE TYPES (what server returns after processing) =====
+export type Sample${capitalizedName}EventResult = Sample${capitalizedName}Event; // No extra server fields for this example
+
+export type ${capitalizedName}EventResult = Sample${capitalizedName}EventResult;
+
+// ===== TYPE MAPPING =====
+export type ${capitalizedName}EventMap = {
+  "SAMPLE_${snakeName}_EVENT": {
+    event: Sample${capitalizedName}Event;
+    result: Sample${capitalizedName}EventResult;
+  };
+};
+
+export type ${capitalizedName}EventType = keyof ${capitalizedName}EventMap;
+
+export type ResultForEvent<T extends ${capitalizedName}Event> =
+  ${capitalizedName}EventMap[T["type"]]["result"];
 
 /**
  * Persistence metadata added by the server
@@ -1670,24 +1867,47 @@ export interface PersistenceMetadata {
  * Change type for server-side persistence
  * Includes all event data plus persistence metadata
  */
-export type Change = Base${capitalizedName}Event & PersistenceMetadata;
-
-/**
- * Client-side event type (alias for Base${capitalizedName}Event)
- */
-export type EditorEvent = Base${capitalizedName}Event;
+export type ${capitalizedName}Change = ${capitalizedName}Event & PersistenceMetadata;
 
 /**
  * Types for change handlers
  */
-export type ChangeType = Change["type"];
+export type ${capitalizedName}ChangeType = ${capitalizedName}Change["type"];
 
-export type ChangeHandler<T extends Change = Change> = (
-  db: DrizzleSqliteDODatabase<typeof schema>,
-  change: T
-) => Promise<{ success: boolean; result?: unknown }>;
+export type ${capitalizedName}ChangeHandler<T extends ${capitalizedName}Event> = (
+  db: D1Database,
+  userShardDb: DrizzleSqliteDODatabase<typeof userShardSchema>,
+  change: T & PersistenceMetadata
+) => Promise<{ success: boolean; result?: ResultForEvent<T> }>;
 
 export type AssertNever = (x: never) => never;
+
+// ===== HANDLER IMPLEMENTATION =====
+export async function handle${capitalizedName}Change(
+  db: D1Database,
+  userShardDb: DrizzleSqliteDODatabase<typeof userShardSchema>,
+  change: ${capitalizedName}Change
+): Promise<{ success: boolean; result?: ${capitalizedName}EventResult }> {
+  switch (change.type) {
+    case "SAMPLE_${snakeName}_EVENT": {
+      // TODO: Implement handler logic
+      // Example: await userShardDb.insert(someTable).values({ ... });
+
+      return {
+        success: true,
+        result: {
+          type: "SAMPLE_${snakeName}_EVENT",
+          sampleData: change.sampleData,
+          previousValue: change.previousValue,
+          newValue: change.newValue,
+          // Add any server-generated fields here
+        }
+      };
+    }
+    default:
+      throw new Error(\`Unknown ${camelName} change type: \${(change as ${capitalizedName}Change).type}\`);
+  }
+}
 `;
 
   await fs.outputFile(`shared/types/${camelName}Events.ts`, eventsContent);
