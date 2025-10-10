@@ -36,6 +36,7 @@ cd examples/init-plus-pages
 node "$CLI_PATH" init --yes
 node "$CLI_PATH" create-page inventory --type dashboard --yes
 node "$CLI_PATH" create-page analytics --type dashboard --yes
+node "$CLI_PATH" create-page feed --type feed --yes
 cd "$SCRIPT_DIR"
 
 # Test 3: Static pages

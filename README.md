@@ -80,16 +80,16 @@ await sendMessage(conversationId, "Hello, how can you help?");
 
 ### 📄 `create-page` - Generate New Pages
 
-Create static or dynamic pages with proper structure:
+Create static, dashboard, or feed pages with proper structure:
 
 ```bash
 dolphin-cli create-page <name> [options]
 
 Arguments:
-  name                     Name of the page (e.g., "about", "pricing")
+  name                     Name of the page (e.g., "about", "pricing", "feed")
 
 Options:
-  -t, --type <type>       Page type (static, dynamic) [default: dynamic]
+  -t, --type <type>       Page type (static, dashboard, feed) [default: static]
   -y, --yes               Skip confirmation prompts
 ```
 
@@ -103,20 +103,39 @@ Creates:
 - `src/client/about/index.html` - Self-contained HTML page
 - Updates `vite.config.ts` automatically
 
-#### Dynamic Pages
+#### Dashboard Pages
 Full SolidJS pages with context, data loading, and state management:
 ```bash
-dolphin-cli create-page dashboard --type dynamic
+dolphin-cli create-page dashboard --type dashboard
 ```
 
 Creates:
 - `src/client/dashboard/index.html` - Entry HTML
 - `src/client/dashboard/index.tsx` - Entry point
-- `src/client/dashboard/DashboardApp.tsx` - Main component
+- `src/client/dashboard/Dashboard.tsx` - Main component
 - `src/client/dashboard/DashboardContext.tsx` - State management
-- `src/client/dashboard/index.css` - Styles
+- `src/client/dashboard/DashboardApiClient.ts` - API client
+- `src/client/dashboard/DashboardAutosaveService.ts` - Autosave functionality
+- `src/client/dashboard/DashboardUndoRedoService.ts` - Undo/redo support
 - Updates `vite.config.ts` automatically
-- Provides `/api/load/dashboard` endpoint template
+- Provides `/api/dashboard/load` and `/api/dashboard/save` endpoint templates
+
+#### Feed Pages
+Twitter-like infinite scroll feed pages with real-time updates:
+```bash
+dolphin-cli create-page feed --type feed
+```
+
+Creates:
+- `src/client/feed/index.html` - Entry HTML
+- `src/client/feed/index.tsx` - Entry point
+- `src/client/feed/Feed.tsx` - Main feed component with infinite scroll
+- `src/client/feed/FeedContext.tsx` - Feed state management
+- `src/client/feed/FeedApiClient.ts` - API client with pagination
+- `src/client/feed/FeedAutosaveService.ts` - Autosave functionality
+- `src/client/feed/FeedUndoRedoService.ts` - Undo/redo support
+- Updates `vite.config.ts` automatically
+- Provides `/api/feed/load` and `/api/feed/save` endpoints with continuation token support
 
 ## Project Structure Expected
 
@@ -184,7 +203,12 @@ dolphin-cli create-page pricing --type static
 
 4. **Create a user dashboard:**
 ```bash
-dolphin-cli create-page dashboard --type dynamic
+dolphin-cli create-page dashboard --type dashboard
+```
+
+5. **Create a social feed:**
+```bash
+dolphin-cli create-page feed --type feed
 ```
 
 ## Development
