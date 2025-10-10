@@ -80,9 +80,9 @@ function toScreamingSnakeCase(name: string): string {
 }
 
 export const createPageCommand = new Command("create-page")
-  .description("Create a new static, dashboard, or feed page")
+  .description("Create a new static, dashboard, feed, or item page")
   .argument("<name>", 'Name of the page (e.g., "about", "pricing", "feed")')
-  .option("-t, --type <type>", "Page type (static, dashboard, feed)", "static")
+  .option("-t, --type <type>", "Page type (static, dashboard, feed, item)", "static")
   .option(
     "-s, --schemas <path>",
     "Path to request-response-schemas file",
@@ -268,6 +268,14 @@ export const createPageCommand = new Command("create-page")
         await createStaticPageFlow(name, spinner);
       } else if (options.type === "feed") {
         await createFeedPageFlow(
+          name,
+          spinner,
+          options.schemas,
+          options.routes,
+          options.userShard
+        );
+      } else if (options.type === "item") {
+        await createItemPageFlow(
           name,
           spinner,
           options.schemas,
@@ -1920,6 +1928,911 @@ export async function handle${capitalizedName}Change(
 
   await fs.outputFile(`shared/types/${camelName}Events.ts`, eventsContent);
   spinner.succeed("Created events file");
+}
+
+async function createItemPageFlow(
+  name: string,
+  spinner: any,
+  schemasPath: string,
+  routesPath: string,
+  userShardPath: string
+) {
+  const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
+  const snakeName = toScreamingSnakeCase(name);
+
+  // Step 1: Create index.html (simple like dashboard)
+  spinner.start("Creating item page structure...");
+
+  const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${capitalizedName} - Template</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+</body>
+</html>`;
+
+  await fs.outputFile(`src/client/${name}/index.html`, indexHtml);
+
+  // Step 2: Create index.tsx (simple entry point)
+  const indexTsx = `import { render } from "solid-js/web";
+import ${capitalizedName} from "./${capitalizedName}";
+import "../styles/app.css";
+
+render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+
+  await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
+
+  // Step 3: Create skeleton component (no sidebar, just lorem ipsum)
+  const mainComponent = `import { Show, createResource } from "solid-js";
+import { createAuthClient } from "better-auth/solid";
+import { ${capitalizedName}Provider, use${capitalizedName} } from "./${capitalizedName}Context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Skeleton } from "~/components/ui/skeleton";
+import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
+
+const authClient = createAuthClient({
+  baseURL: window.location.origin,
+});
+
+function ${capitalizedName}Skeleton() {
+  return (
+    <div class="min-h-screen font-manrope p-6">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <Skeleton class="h-8 w-64" />
+        <Skeleton class="h-64 w-full" />
+      </div>
+    </div>
+  );
+}
+
+function ${capitalizedName}Content() {
+  const { store } = use${capitalizedName}();
+
+  return (
+    <div class="min-h-screen font-manrope p-6">
+      <div class="max-w-4xl mx-auto space-y-6">
+        {/* TODO: Replace this placeholder content */}
+        <div>
+          <h1 class="text-4xl font-bold tracking-tight">Lorem Ipsum</h1>
+          <p class="text-muted-foreground mt-2">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+          </p>
+        </div>
+
+        {/* TODO: Replace these placeholder cards */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Placeholder Content</CardTitle>
+            <CardDescription>
+              Replace this with your actual item content
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p class="text-sm text-muted-foreground">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+              incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+              nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+              Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore
+              eu fugiat nulla pariatur.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>More Placeholder Content</CardTitle>
+            <CardDescription>
+              This is an example of displaying item details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p class="text-sm text-muted-foreground">
+              Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium
+              doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore
+              veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+export default function ${capitalizedName}() {
+  // Get id from URL query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const itemId = urlParams.get('id');
+
+  // Load item data using createResource with id parameter
+  const [${camelName}Data] = createResource(async () => {
+    if (!itemId) {
+      throw new Error("No id provided");
+    }
+    try {
+      const data = await ${camelName}ApiClient.load${capitalizedName}(itemId);
+      console.log("${capitalizedName} data:", data);
+      return data;
+    } catch (error) {
+      console.error("Failed to load ${name}:", error);
+      throw error;
+    }
+  });
+
+  const session = authClient.useSession();
+
+  return (
+    <Show
+      when={session() && !session().isPending && !${camelName}Data.loading}
+      fallback={<${capitalizedName}Skeleton />}
+    >
+      <Show
+        when={session().data?.user}
+        fallback={
+          <div>
+            {(() => {
+              window.location.href = \`/login/?redirect=\${window.location.pathname}\${window.location.search}\`;
+              return "Redirecting...";
+            })()}
+          </div>
+        }
+      >
+        <${capitalizedName}Provider
+          initialData={${camelName}Data()!}
+          user={session()!.data!.user!}
+        >
+          <${capitalizedName}Content />
+        </${capitalizedName}Provider>
+      </Show>
+    </Show>
+  );
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}.tsx`,
+    mainComponent
+  );
+
+  spinner.succeed("Created main component");
+
+  // Continue with other files...
+  spinner.start("Creating context and services...");
+
+  // Step 4: Create Context (simplified version)
+  const contextFile = `import {
+  createContext,
+  useContext,
+  type ParentComponent,
+  createMemo,
+  onCleanup,
+  createSignal,
+  createEffect,
+  on,
+  JSX,
+} from "solid-js";
+import { createStore, type SetStoreFunction } from "solid-js/store";
+import { ${capitalizedName}AutosaveService } from "./${capitalizedName}AutosaveService";
+import { ${capitalizedName}UndoRedoService } from "./${capitalizedName}UndoRedoService";
+import type { ${capitalizedName}Event } from "@shared/types/${camelName}Events";
+import type { User } from "better-auth";
+// Import database types like this:
+// import type { User as UserSchema } from "@shared/types/primitives";
+import { process${capitalizedName}EventQueue, process${capitalizedName}EventResultQueue } from "./${camelName}EventProcessor";
+import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
+import { Load${capitalizedName}Response } from "@shared/types/request-response-schemas";
+
+export interface ${capitalizedName}Store {
+  // User data
+  user: User;
+
+  // UI state
+  isLoading: boolean;
+  error: string | null;
+
+  loadedData: Load${capitalizedName}Response;
+}
+
+export interface ${capitalizedName}Actions {
+  // Add your specific actions here
+}
+
+interface ${capitalizedName}ContextType {
+  store: ${capitalizedName}Store;
+  actions: ${capitalizedName}Actions;
+  autosave: ${capitalizedName}AutosaveService;
+  undoRedo: ${capitalizedName}UndoRedoService;
+  emitEvent: (event: ${capitalizedName}Event) => void;
+}
+
+const ${capitalizedName}Context = createContext<${capitalizedName}ContextType>();
+
+export function ${capitalizedName}Provider(props: {
+  children: JSX.Element;
+  initialData: Load${capitalizedName}Response;
+  user: User;
+}) {
+  const [store, setStore] = createStore<${capitalizedName}Store>({
+    user: props.user,
+    isLoading: false,
+    error: null,
+
+    loadedData: props.initialData,
+  });
+
+  // Initialize services
+  const autosave = new ${capitalizedName}AutosaveService();
+  const undoRedo = new ${capitalizedName}UndoRedoService();
+
+  // Initialize autosave with store and result processor
+  autosave.initialize(store, setStore, (results) => {
+    process${capitalizedName}EventResultQueue(results, store, setStore);
+  });
+
+  const actions: ${capitalizedName}Actions = {
+  };
+
+  const emitEvent = (event: ${capitalizedName}Event) => {
+    // Queue for autosave (sends to server)
+    autosave.queueEvent(event);
+
+    // Process locally for optimistic UI updates
+    process${capitalizedName}EventQueue([event], store, setStore);
+  };
+
+  // Cleanup on unmount
+  onCleanup(() => {
+    autosave.destroy();
+    undoRedo.clear();
+  });
+
+  return (
+    <${capitalizedName}Context.Provider
+      value={{ store, actions, autosave, undoRedo, emitEvent }}
+    >
+      {props.children}
+    </${capitalizedName}Context.Provider>
+  );
+}
+
+export function use${capitalizedName}() {
+  const context = useContext(${capitalizedName}Context);
+  if (!context) {
+    throw new Error("use${capitalizedName} must be used within a ${capitalizedName}Provider");
+  }
+  return context;
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}Context.tsx`,
+    contextFile
+  );
+
+  // Step 5: Create event processor
+  const eventProcessor = `import type { SetStoreFunction } from "solid-js/store";
+import type { ${capitalizedName}Store } from "./${capitalizedName}Context";
+import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from "@shared/types/${camelName}Events";
+
+export function process${capitalizedName}EventQueue(
+  events: ${capitalizedName}Event[],
+  store: ${capitalizedName}Store,
+  setStore: SetStoreFunction<${capitalizedName}Store>
+) {
+  for (const event of events) {
+    process${capitalizedName}Event(event, store, setStore);
+  }
+}
+
+export function process${capitalizedName}Event(
+  event: ${capitalizedName}Event,
+  store: ${capitalizedName}Store,
+  setStore: SetStoreFunction<${capitalizedName}Store>
+) {
+  switch (event.type) {
+    case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
+      // TODO: Add optimistic UI update logic here
+      // Example: setStore("data", "someField", event.newValue);
+      break;
+    }
+    default:
+      console.warn("Unknown ${name} event type:", event);
+  }
+}
+
+export function process${capitalizedName}EventResultQueue(
+  results: ${capitalizedName}EventResult[],
+  store: ${capitalizedName}Store,
+  setStore: SetStoreFunction<${capitalizedName}Store>
+) {
+  for (const result of results) {
+    process${capitalizedName}EventResult(result, store, setStore);
+  }
+}
+
+export function process${capitalizedName}EventResult(
+  result: ${capitalizedName}EventResult,
+  store: ${capitalizedName}Store,
+  setStore: SetStoreFunction<${capitalizedName}Store>
+) {
+  switch (result.type) {
+    case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
+      // TODO: Process server response here
+      // Example: Update UI with server-generated IDs or confirmations
+      // setStore("data", "items", (items) => items.map(item =>
+      //   item.tempId === result.tempId ? { ...item, id: result.id } : item
+      // ));
+      break;
+    }
+    default:
+      console.warn("Unknown ${name} event result type:", result);
+  }
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${camelName}EventProcessor.ts`,
+    eventProcessor
+  );
+
+  spinner.succeed("Created context, event processor");
+
+  // Step 6: Update vite.config.ts
+  spinner.start("Updating vite.config.ts...");
+  await updateViteConfig(name);
+  spinner.succeed("Updated vite.config.ts");
+
+  // Step 7: Create ApiClient file and append types to schemas
+  spinner.start("Creating API client and updating types...");
+
+  // Calculate relative import path from the API client location to the schemas file
+  const apiClientPath = `src/client/${name}/${capitalizedName}ApiClient.ts`;
+  const relativeImportPath = path
+    .relative(path.dirname(apiClientPath), schemasPath.replace(/\.ts$/, ""))
+    .replace(/\\/g, "/");
+
+  const apiClientFile = `import type {
+  Load${capitalizedName}Response,
+  Load${capitalizedName}Request,
+  Save${capitalizedName}Request,
+  Save${capitalizedName}Response
+} from "${
+    relativeImportPath.startsWith(".")
+      ? relativeImportPath
+      : "./" + relativeImportPath
+  }";
+
+class ${capitalizedName}ApiClient {
+  private baseUrl = "/api/${name}";
+
+  async load${capitalizedName}(id: string): Promise<Load${capitalizedName}Response> {
+    const response = await fetch(\`\${this.baseUrl}/load?id=\${id}\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to load ${name}");
+    return response.json();
+  }
+
+  async save${capitalizedName}(
+    request: Save${capitalizedName}Request
+  ): Promise<Save${capitalizedName}Response> {
+    const response = await fetch(\`\${this.baseUrl}/save\`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to save ${name} changes");
+    return response.json();
+  }
+}
+
+export const ${camelName}ApiClient = new ${capitalizedName}ApiClient();`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}ApiClient.ts`,
+    apiClientFile
+  );
+
+  // Append types to schemas file
+  const typesToAppend = `
+// ${capitalizedName} API Types
+import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from "./${camelName}Events";
+
+export const Load${capitalizedName}RequestSchema = z.object({
+  id: z.string(),
+});
+
+export const Load${capitalizedName}ResponseSchema = z.object({
+  data: z.any(), // Update this with your specific data schema
+  // Add your response properties here
+});
+
+export const Save${capitalizedName}RequestSchema = z.object({
+  events: z.array(z.custom<${capitalizedName}Event>()),
+});
+
+export const Save${capitalizedName}ResponseSchema = z.object({
+  success: z.boolean(),
+  processedCount: z.number(),
+  totalChanges: z.number(),
+  results: z.array(z.custom<${capitalizedName}EventResult>()),
+});
+
+export type Load${capitalizedName}Request = z.infer<typeof Load${capitalizedName}RequestSchema>;
+export type Load${capitalizedName}Response = z.infer<typeof Load${capitalizedName}ResponseSchema>;
+export type Save${capitalizedName}Request = z.infer<typeof Save${capitalizedName}RequestSchema>;
+export type Save${capitalizedName}Response = z.infer<typeof Save${capitalizedName}ResponseSchema>;`;
+
+  if (await fs.pathExists(schemasPath)) {
+    const existingContent = await fs.readFile(schemasPath, "utf8");
+    const updatedContent = existingContent + typesToAppend;
+    await fs.writeFile(schemasPath, updatedContent);
+    spinner.text = "Created API client and updated schemas";
+  } else {
+    // Create the schemas file if it doesn't exist
+    const schemasContent = `import { z } from "zod";
+
+export const ErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  statusCode: z.number(),
+});
+
+export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+${typesToAppend}`;
+
+    await fs.outputFile(schemasPath, schemasContent);
+    spinner.text = "Created API client and schemas file";
+  }
+
+  spinner.succeed("Created API client and updated types");
+
+  // Step 8: Create AutosaveService
+  spinner.start("Creating AutosaveService...");
+
+  const autosaveService = `import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from '@shared/types/${camelName}Events';
+import type { SetStoreFunction } from 'solid-js/store';
+import type { ${capitalizedName}Store } from './${capitalizedName}Context';
+import { ${camelName}ApiClient } from './${capitalizedName}ApiClient';
+
+export class ${capitalizedName}AutosaveService {
+  private eventQueue: ${capitalizedName}Event[] = [];
+  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private store: ${capitalizedName}Store | null = null;
+  private setStore: SetStoreFunction<${capitalizedName}Store> | null = null;
+  private processResults: ((results: ${capitalizedName}EventResult[]) => void) | null = null;
+
+  // This is the debounce time of saves on this page. If this page has lots of simultaneous changes, you can increase this.
+  // If the page doesn't ofter have lots of simultaneous changes, you can decrease this.
+  private readonly DEBOUNCE_MS = 10;
+
+  initialize(
+    store: ${capitalizedName}Store,
+    setStore: SetStoreFunction<${capitalizedName}Store>,
+    processResults: (results: ${capitalizedName}EventResult[]) => void
+  ) {
+    this.store = store;
+    this.setStore = setStore;
+    this.processResults = processResults;
+  }
+
+  queueEvent(event: ${capitalizedName}Event) {
+    this.eventQueue.push(event);
+    this.scheduleSave();
+  }
+
+  private scheduleSave() {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+
+    this.saveTimeout = setTimeout(() => {
+      void this.flush();
+    }, this.DEBOUNCE_MS);
+  }
+
+  async flush() {
+    if (this.eventQueue.length === 0) return;
+
+    const eventsToSave = [...this.eventQueue];
+    this.eventQueue = [];
+
+    try {
+      const response = await ${camelName}ApiClient.save${capitalizedName}({
+        events: eventsToSave,
+      });
+
+      if (this.processResults && response.results) {
+        this.processResults(response.results);
+      }
+    } catch (error) {
+      console.error('Failed to save ${name} changes:', error);
+      // Re-queue the events if save fails
+      this.eventQueue.unshift(...eventsToSave);
+    }
+  }
+
+  destroy() {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    void this.flush();
+  }
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}AutosaveService.ts`,
+    autosaveService
+  );
+  spinner.succeed("Created AutosaveService");
+
+  // Step 9: Create UndoRedoService
+  spinner.start("Creating UndoRedoService...");
+
+  const undoRedoService = `interface Action {
+  undo: () => void;
+  redo: () => void;
+  description?: string;
+}
+
+export class ${capitalizedName}UndoRedoService {
+  private undoStack: Action[] = [];
+  private redoStack: Action[] = [];
+  private maxStackSize = 100;
+
+  pushAction(action: Action) {
+    this.undoStack.push(action);
+    this.redoStack = [];
+
+    if (this.undoStack.length > this.maxStackSize) {
+      this.undoStack.shift();
+    }
+  }
+
+  undo() {
+    const action = this.undoStack.pop();
+    if (!action) return;
+
+    action.undo();
+    this.redoStack.push(action);
+  }
+
+  redo() {
+    const action = this.redoStack.pop();
+    if (!action) return;
+
+    action.redo();
+    this.undoStack.push(action);
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  clear() {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
+  getUndoDescription(): string | undefined {
+    return this.undoStack[this.undoStack.length - 1]?.description;
+  }
+
+  getRedoDescription(): string | undefined {
+    return this.redoStack[this.redoStack.length - 1]?.description;
+  }
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}UndoRedoService.ts`,
+    undoRedoService
+  );
+  spinner.succeed("Created UndoRedoService");
+
+  // Step 10: Add routes to index.ts with id parameter
+  await addItemRoutesToIndex(name, routesPath, spinner);
+
+  // Step 11: Add UserShard functions with id parameter
+  await addItemUserShardFunctions(name, userShardPath, spinner);
+
+  // Step 12: Create events file
+  await createEventsFile(name, spinner);
+
+  // Step 13: Update vite.config.ts
+  spinner.start("Updating vite.config.ts...");
+  await updateViteConfig(name);
+  spinner.succeed("Updated vite.config.ts");
+}
+
+async function addItemRoutesToIndex(
+  name: string,
+  routesPath: string,
+  spinner: any
+) {
+  spinner.start("Adding routes to index.ts...");
+
+  const capitalizedName = toPascalCase(name);
+
+  if (!(await fs.pathExists(routesPath))) {
+    spinner.warn(
+      `Routes file not found at ${routesPath}, skipping route generation`
+    );
+    return;
+  }
+
+  const routesContent = await fs.readFile(routesPath, "utf8");
+
+  // Check if we need to add imports
+  let updatedContent = routesContent;
+
+  // Add ContentfulStatusCode import if not present
+  if (!routesContent.includes('ContentfulStatusCode')) {
+    const contentfulImportMatch = updatedContent.match(
+      /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
+    );
+    if (!contentfulImportMatch) {
+      // Add the import after the first import statement
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import { ContentfulStatusCode } from "hono/utils/http-status";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    } else {
+      // ContentfulStatusCode might already be imported, check if it's in the list
+      const existingImports = contentfulImportMatch[1].trim();
+      if (!existingImports.includes('ContentfulStatusCode')) {
+        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+        updatedContent = updatedContent.replace(
+          contentfulImportMatch[0],
+          `import { ${newImports} } from "hono/utils/http-status";`
+        );
+      }
+    }
+  }
+
+  // Add schema imports if not present
+  if (!routesContent.includes(`Load${capitalizedName}ResponseSchema`)) {
+    const importMatch = routesContent.match(
+      /import {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+    );
+    if (importMatch) {
+      const existingImports = importMatch[1].trim();
+      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Load${capitalizedName}ResponseSchema,\n  Save${capitalizedName}RequestSchema,\n  Save${capitalizedName}ResponseSchema`;
+      updatedContent = updatedContent.replace(
+        importMatch[0],
+        `import {${newImports}} from "@shared/types/request-response-schemas";`
+      );
+    } else {
+      // Add the import if it doesn't exist
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import { Load${capitalizedName}ResponseSchema, Save${capitalizedName}RequestSchema, Save${capitalizedName}ResponseSchema } from "@shared/types/request-response-schemas";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    }
+  }
+
+  // Add routes before the export statement
+  const exportMatch = updatedContent.match(/export\s+(default\s+)?app;/);
+  if (exportMatch) {
+    const routesToAdd = `
+// ${capitalizedName} routes
+app.get("/api/${name}/load", async (c) => {
+  const user = await getAuthenticatedUser(c);
+  if (!user) {
+    return sendError(c, 401, "Unauthorized");
+  }
+
+  const id = c.req.query("id");
+  if (!id) {
+    return sendError(c, 400, "Missing id parameter");
+  }
+
+  const shardId = c.env.USER_SHARD.idFromName(user.id);
+  const userShard = c.env.USER_SHARD.get(shardId);
+
+  const result = await userShard.load${capitalizedName}(user.id, id);
+
+  if ("error" in result) {
+    return sendError(c, 500, result.error);
+  }
+
+  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+});
+
+app.post(
+  "/api/${name}/save",
+  zValidator("json", Save${capitalizedName}RequestSchema),
+  async (c) => {
+    const user = await getAuthenticatedUser(c);
+    if (!user) {
+      return sendError(c, 401, "Unauthorized");
+    }
+
+    const { events } = c.req.valid("json");
+
+    const shardId = c.env.USER_SHARD.idFromName(user.id);
+    const userShard = c.env.USER_SHARD.get(shardId);
+
+    const result = await userShard.save${capitalizedName}(user.id, events);
+
+    if ("error" in result) {
+      return sendError(c, 500, result.error);
+    }
+
+    return send(c, Save${capitalizedName}ResponseSchema, result, 200);
+  }
+);
+
+`;
+
+    updatedContent = updatedContent.replace(
+      exportMatch[0],
+      `${routesToAdd}${exportMatch[0]}`
+    );
+  }
+
+  await fs.writeFile(routesPath, updatedContent);
+  spinner.succeed("Added routes to index.ts");
+}
+
+async function addItemUserShardFunctions(
+  name: string,
+  userShardPath: string,
+  spinner: any
+) {
+  spinner.start("Adding UserShard functions...");
+
+  const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
+
+  if (!(await fs.pathExists(userShardPath))) {
+    spinner.warn(
+      `UserShard file not found at ${userShardPath}, skipping UserShard function generation`
+    );
+    return;
+  }
+
+  const userShardContent = await fs.readFile(userShardPath, "utf8");
+
+  // Add import for types
+  let updatedContent = userShardContent;
+
+  if (!userShardContent.includes(`Load${capitalizedName}Response`)) {
+    const importMatch = userShardContent.match(
+      /import\s+type\s+{([^}]+)}\s+from\s+["']@shared\/types\/request-response-schemas["'];?/
+    );
+
+    if (importMatch) {
+      const existingImports = importMatch[1].trim();
+      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Load${capitalizedName}Response,\n  Save${capitalizedName}Response,\n  ErrorResponse`;
+      updatedContent = updatedContent.replace(
+        importMatch[0],
+        `import type {${newImports}} from "@shared/types/request-response-schemas";`
+      );
+    } else {
+      // Add the import if it doesn't exist
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import type { Load${capitalizedName}Response, Save${capitalizedName}Response, ErrorResponse } from "@shared/types/request-response-schemas";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    }
+  }
+
+  // Add event import
+  if (!userShardContent.includes(`${capitalizedName}Event`)) {
+    const eventImportMatch = updatedContent.match(
+      /import\s+type\s+{([^}]+)}\s+from\s+["']@shared\/types\/${camelName}Events["'];?/
+    );
+
+    if (!eventImportMatch) {
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from "@shared/types/${camelName}Events";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    }
+  }
+
+  // Add the functions before the last closing brace of the class
+  const functionsToAdd = `
+  async load${capitalizedName}(userId: string, id: string): Promise<Load${capitalizedName}Response | ErrorResponse> {
+    try {
+      // TODO: Implement load logic for ${name} with id parameter
+      // Example: Query your schema tables using the id and return data
+      const data = {
+        // Add your data loading logic here
+        // Use the id parameter to fetch specific item
+      };
+
+      return {
+        data,
+        // Add other response fields as needed
+      } as Load${capitalizedName}Response;
+    } catch (error) {
+      console.error("Error loading ${name}:", error);
+      return {
+        error: "Failed to load ${name}",
+        success: false,
+        statusCode: 500,
+      };
+    }
+  }
+
+  async save${capitalizedName}(
+    userId: string,
+    events: ${capitalizedName}Event[]
+  ): Promise<Save${capitalizedName}Response | ErrorResponse> {
+    try {
+      const results: ${capitalizedName}EventResult[] = [];
+      let processedCount = 0;
+
+      for (const event of events) {
+        // TODO: Process each event and update your data
+        // Example event processing:
+        switch (event.type) {
+          case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
+            // Process the event
+            processedCount++;
+            results.push({
+              type: event.type,
+              // Add result data
+            } as ${capitalizedName}EventResult);
+            break;
+          }
+          default:
+            console.warn("Unknown ${name} event type:", event);
+        }
+      }
+
+      return {
+        success: true,
+        processedCount,
+        totalChanges: processedCount,
+        results,
+      };
+    } catch (error) {
+      console.error("Error saving ${name}:", error);
+      return {
+        error: "Failed to save ${name}",
+        success: false,
+        statusCode: 500,
+      };
+    }
+  }
+`;
+
+  // Find the last closing brace of the class
+  const lastClosingBrace = updatedContent.lastIndexOf('}');
+  if (lastClosingBrace !== -1) {
+    updatedContent =
+      updatedContent.slice(0, lastClosingBrace) +
+      functionsToAdd +
+      updatedContent.slice(lastClosingBrace);
+  }
+
+  await fs.writeFile(userShardPath, updatedContent);
+  spinner.succeed("Added UserShard functions");
 }
 
 async function createFeedPageFlow(
