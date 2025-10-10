@@ -80,9 +80,9 @@ function toScreamingSnakeCase(name: string): string {
 }
 
 export const createPageCommand = new Command("create-page")
-  .description("Create a new static, dashboard, feed, item, or gallery page")
+  .description("Create a new static, dashboard, feed, item, gallery, or redirect page")
   .argument("<name>", 'Name of the page (e.g., "about", "pricing", "feed")')
-  .option("-t, --type <type>", "Page type (static, dashboard, feed, item, gallery)", "static")
+  .option("-t, --type <type>", "Page type (static, dashboard, feed, item, gallery, redirect)", "static")
   .option(
     "-s, --schemas <path>",
     "Path to request-response-schemas file",
@@ -288,6 +288,14 @@ export const createPageCommand = new Command("create-page")
           spinner,
           options.schemas,
           options.routes
+        );
+      } else if (options.type === "redirect") {
+        await createRedirectPageFlow(
+          name,
+          spinner,
+          options.schemas,
+          options.routes,
+          options.userShard
         );
       } else {
         await createDashboardPageFlow(
@@ -2971,6 +2979,241 @@ export class ${capitalizedName}UndoRedoService {
   spinner.succeed("Updated vite.config.ts");
 }
 
+async function createRedirectPageFlow(
+  name: string,
+  spinner: any,
+  schemasPath: string,
+  routesPath: string,
+  userShardPath: string
+) {
+  const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
+
+  // Step 1: Create index.html
+  spinner.start("Creating redirect page structure...");
+
+  const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${capitalizedName} - Template</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+</body>
+</html>`;
+
+  await fs.outputFile(`src/client/${name}/index.html`, indexHtml);
+
+  // Step 2: Create index.tsx
+  const indexTsx = `import { render } from "solid-js/web";
+import ${capitalizedName} from "./${capitalizedName}";
+import "../styles/app.css";
+
+render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+
+  await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
+
+  // Step 3: Create main component with loading spinner
+  const mainComponent = `import { Show, createResource } from "solid-js";
+import { createAuthClient } from "better-auth/solid";
+import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
+
+const authClient = createAuthClient({
+  baseURL: window.location.origin,
+});
+
+function LoadingSpinner() {
+  return (
+    <div class="min-h-screen flex items-center justify-center font-manrope">
+      <div class="flex flex-col items-center gap-4">
+        <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p class="text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function ErrorDisplay(props: { message: string }) {
+  return (
+    <div class="min-h-screen flex items-center justify-center font-manrope p-6">
+      <div class="max-w-md text-center space-y-4">
+        <div class="text-6xl">⚠️</div>
+        <h1 class="text-2xl font-bold">Error</h1>
+        <p class="text-muted-foreground">{props.message}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function ${capitalizedName}() {
+  // Get code from URL query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+
+  // Load redirect data using createResource with code parameter
+  const [redirectData] = createResource(async () => {
+    if (!code) {
+      throw new Error("No code provided");
+    }
+    try {
+      const data = await ${camelName}ApiClient.process${capitalizedName}Code(code);
+      console.log("${capitalizedName} data:", data);
+
+      // Redirect to the URL returned by the server
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Failed to process ${name} code:", error);
+      throw error;
+    }
+  });
+
+  const session = authClient.useSession();
+
+  return (
+    <Show
+      when={!code}
+      fallback={
+        <Show
+          when={session() && !session().isPending}
+          fallback={<LoadingSpinner />}
+        >
+          <Show
+            when={session().data?.user}
+            fallback={
+              <div>
+                {(() => {
+                  window.location.href = \`/login/?redirect=\${window.location.pathname}\${window.location.search}\`;
+                  return "Redirecting...";
+                })()}
+              </div>
+            }
+          >
+            <Show
+              when={!redirectData.loading && !redirectData.error}
+              fallback={
+                <Show
+                  when={redirectData.error}
+                  fallback={<LoadingSpinner />}
+                >
+                  <ErrorDisplay message={redirectData.error?.message || "Failed to process code"} />
+                </Show>
+              }
+            >
+              <LoadingSpinner />
+            </Show>
+          </Show>
+        </Show>
+      }
+    >
+      <ErrorDisplay message="No code provided" />
+    </Show>
+  );
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}.tsx`,
+    mainComponent
+  );
+
+  spinner.succeed("Created main component");
+
+  // Step 4: Create ApiClient file
+  spinner.start("Creating API client and updating types...");
+
+  // Calculate relative import path from the API client location to the schemas file
+  const apiClientPath = `src/client/${name}/${capitalizedName}ApiClient.ts`;
+  const relativeImportPath = path
+    .relative(path.dirname(apiClientPath), schemasPath.replace(/\.ts$/, ""))
+    .replace(/\\/g, "/");
+
+  const apiClientFile = `import type {
+  Process${capitalizedName}CodeResponse,
+} from "${
+    relativeImportPath.startsWith(".")
+      ? relativeImportPath
+      : "./" + relativeImportPath
+  }";
+
+class ${capitalizedName}ApiClient {
+  private baseUrl = "/api/${name}";
+
+  async process${capitalizedName}Code(code: string): Promise<Process${capitalizedName}CodeResponse> {
+    const response = await fetch(\`\${this.baseUrl}/code?code=\${code}\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+
+    if (!response.ok) throw new Error("Failed to process ${name} code");
+    return response.json();
+  }
+}
+
+export const ${camelName}ApiClient = new ${capitalizedName}ApiClient();`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}ApiClient.ts`,
+    apiClientFile
+  );
+
+  // Append types to schemas file
+  const typesToAppend = `
+// ${capitalizedName} API Types
+export const Process${capitalizedName}CodeRequestSchema = z.object({
+  code: z.string(),
+});
+
+export const Process${capitalizedName}CodeResponseSchema = z.object({
+  redirectUrl: z.string(),
+  // Add your response properties here
+});
+
+export type Process${capitalizedName}CodeRequest = z.infer<typeof Process${capitalizedName}CodeRequestSchema>;
+export type Process${capitalizedName}CodeResponse = z.infer<typeof Process${capitalizedName}CodeResponseSchema>;`;
+
+  if (await fs.pathExists(schemasPath)) {
+    const existingContent = await fs.readFile(schemasPath, "utf8");
+    const updatedContent = existingContent + typesToAppend;
+    await fs.writeFile(schemasPath, updatedContent);
+    spinner.text = "Created API client and updated schemas";
+  } else {
+    // Create the schemas file if it doesn't exist
+    const schemasContent = `import { z } from "zod";
+
+export const ErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  statusCode: z.number(),
+});
+
+export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+${typesToAppend}`;
+
+    await fs.outputFile(schemasPath, schemasContent);
+    spinner.text = "Created API client and schemas file";
+  }
+
+  spinner.succeed("Created API client and updated types");
+
+  // Step 5: Add routes to index.ts
+  await addRedirectRoutesToIndex(name, routesPath, spinner);
+
+  // Step 6: Add UserShard functions
+  await addRedirectUserShardFunctions(name, userShardPath, spinner);
+
+  // Step 7: Update vite.config.ts
+  spinner.start("Updating vite.config.ts...");
+  await updateViteConfig(name);
+  spinner.succeed("Updated vite.config.ts");
+}
+
 async function addItemRoutesToIndex(
   name: string,
   routesPath: string,
@@ -3231,6 +3474,211 @@ async function addItemUserShardFunctions(
       console.error("Error saving ${name}:", error);
       return {
         error: "Failed to save ${name}",
+        success: false,
+        statusCode: 500,
+      };
+    }
+  }
+`;
+
+  // Find the last closing brace of the class
+  const lastClosingBrace = updatedContent.lastIndexOf('}');
+  if (lastClosingBrace !== -1) {
+    updatedContent =
+      updatedContent.slice(0, lastClosingBrace) +
+      functionsToAdd +
+      updatedContent.slice(lastClosingBrace);
+  }
+
+  await fs.writeFile(userShardPath, updatedContent);
+  spinner.succeed("Added UserShard functions");
+}
+
+async function addRedirectRoutesToIndex(
+  name: string,
+  routesPath: string,
+  spinner: any
+) {
+  spinner.start("Adding routes to index.ts...");
+
+  const capitalizedName = toPascalCase(name);
+
+  if (!(await fs.pathExists(routesPath))) {
+    spinner.warn(
+      `Routes file not found at ${routesPath}, skipping route generation`
+    );
+    return;
+  }
+
+  const routesContent = await fs.readFile(routesPath, "utf8");
+
+  // Check if we need to add imports
+  let updatedContent = routesContent;
+
+  // Add ContentfulStatusCode import if not present
+  if (!routesContent.includes('ContentfulStatusCode')) {
+    const contentfulImportMatch = updatedContent.match(
+      /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
+    );
+    if (!contentfulImportMatch) {
+      // Add the import after the first import statement
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import { ContentfulStatusCode } from "hono/utils/http-status";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    } else {
+      // ContentfulStatusCode might already be imported, check if it's in the list
+      const existingImports = contentfulImportMatch[1].trim();
+      if (!existingImports.includes('ContentfulStatusCode')) {
+        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+        updatedContent = updatedContent.replace(
+          contentfulImportMatch[0],
+          `import { ${newImports} } from "hono/utils/http-status";`
+        );
+      }
+    }
+  }
+
+  // Add schema imports if not present
+  if (!routesContent.includes(`Process${capitalizedName}CodeResponseSchema`)) {
+    const importMatch = routesContent.match(
+      /import {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+    );
+    if (importMatch) {
+      const existingImports = importMatch[1].trim();
+      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Process${capitalizedName}CodeResponseSchema`;
+      updatedContent = updatedContent.replace(
+        importMatch[0],
+        `import {${newImports}} from "@shared/types/request-response-schemas";`
+      );
+    } else {
+      // Add the import if it doesn't exist
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import { Process${capitalizedName}CodeResponseSchema } from "@shared/types/request-response-schemas";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    }
+  }
+
+  // Add routes before the export statement
+  const exportMatch = updatedContent.match(/export\s+(default\s+)?app;/);
+  if (exportMatch) {
+    const routesToAdd = `
+// ${capitalizedName} routes
+app.get("/api/${name}/code", async (c) => {
+  const user = await getAuthenticatedUser(c);
+  if (!user) {
+    return sendError(c, 401, "Unauthorized");
+  }
+
+  const code = c.req.query("code");
+  if (!code) {
+    return sendError(c, 400, "Missing code parameter");
+  }
+
+  const shardId = c.env.USER_SHARD.idFromName(user.id);
+  const userShard = c.env.USER_SHARD.get(shardId);
+
+  const result = await userShard.process${capitalizedName}Code(user.id, code);
+
+  if ("error" in result) {
+    return sendError(c, 500, result.error);
+  }
+
+  return send(c, Process${capitalizedName}CodeResponseSchema, result, 200);
+});
+
+`;
+
+    updatedContent = updatedContent.replace(
+      exportMatch[0],
+      `${routesToAdd}${exportMatch[0]}`
+    );
+  }
+
+  await fs.writeFile(routesPath, updatedContent);
+  spinner.succeed("Added routes to index.ts");
+}
+
+async function addRedirectUserShardFunctions(
+  name: string,
+  userShardPath: string,
+  spinner: any
+) {
+  spinner.start("Adding UserShard functions...");
+
+  const capitalizedName = toPascalCase(name);
+
+  if (!(await fs.pathExists(userShardPath))) {
+    spinner.warn(
+      `UserShard file not found at ${userShardPath}, skipping UserShard function generation`
+    );
+    return;
+  }
+
+  const userShardContent = await fs.readFile(userShardPath, "utf8");
+
+  // Add import for types
+  let updatedContent = userShardContent;
+
+  if (!userShardContent.includes(`Process${capitalizedName}CodeResponse`)) {
+    const importMatch = userShardContent.match(
+      /import\s+type\s+{([^}]+)}\s+from\s+["']@shared\/types\/request-response-schemas["'];?/
+    );
+
+    if (importMatch) {
+      const existingImports = importMatch[1].trim();
+      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Process${capitalizedName}CodeResponse,\n  ErrorResponse`;
+      updatedContent = updatedContent.replace(
+        importMatch[0],
+        `import type {${newImports}} from "@shared/types/request-response-schemas";`
+      );
+    } else {
+      // Add the import if it doesn't exist
+      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      if (firstImportEnd !== -1) {
+        updatedContent =
+          updatedContent.slice(0, firstImportEnd + 1) +
+          `import type { Process${capitalizedName}CodeResponse, ErrorResponse } from "@shared/types/request-response-schemas";\n` +
+          updatedContent.slice(firstImportEnd + 1);
+      }
+    }
+  }
+
+  // Add the function before the last closing brace of the class
+  const functionsToAdd = `
+  async process${capitalizedName}Code(userId: string, code: string): Promise<Process${capitalizedName}CodeResponse | ErrorResponse> {
+    try {
+      // TODO: Implement code processing logic for ${name}
+      // Example: Validate the code and determine redirect URL
+      // This could be used for subscription success, invite links, etc.
+
+      // Example implementation:
+      // const validCode = await this.validateCode(code);
+      // if (!validCode) {
+      //   return {
+      //     error: "Invalid code",
+      //     success: false,
+      //     statusCode: 400,
+      //   };
+      // }
+
+      const redirectUrl = "/dashboard"; // Replace with your logic
+
+      return {
+        redirectUrl,
+        // Add other response fields as needed
+      } as Process${capitalizedName}CodeResponse;
+    } catch (error) {
+      console.error("Error processing ${name} code:", error);
+      return {
+        error: "Failed to process ${name} code",
         success: false,
         statusCode: 500,
       };
