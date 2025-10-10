@@ -80,9 +80,9 @@ function toScreamingSnakeCase(name: string): string {
 }
 
 export const createPageCommand = new Command("create-page")
-  .description("Create a new static, dashboard, feed, or item page")
+  .description("Create a new static, dashboard, feed, item, or gallery page")
   .argument("<name>", 'Name of the page (e.g., "about", "pricing", "feed")')
-  .option("-t, --type <type>", "Page type (static, dashboard, feed, item)", "static")
+  .option("-t, --type <type>", "Page type (static, dashboard, feed, item, gallery)", "static")
   .option(
     "-s, --schemas <path>",
     "Path to request-response-schemas file",
@@ -281,6 +281,13 @@ export const createPageCommand = new Command("create-page")
           options.schemas,
           options.routes,
           options.userShard
+        );
+      } else if (options.type === "gallery") {
+        await createGalleryPageFlow(
+          name,
+          spinner,
+          options.schemas,
+          options.routes
         );
       } else {
         await createDashboardPageFlow(
@@ -1487,6 +1494,415 @@ export type ${capitalizedName}Event = {
 };
 
 export type Change = ${capitalizedName}Event | OtherEvent;`)
+  );
+
+  spinner.succeed("API integration info created");
+}
+
+async function createGalleryPageFlow(
+  name: string,
+  spinner: any,
+  schemasPath: string,
+  routesPath: string
+) {
+  const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
+
+  // Step 1: Create index.html
+  spinner.start("Creating gallery page structure...");
+
+  const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${capitalizedName} - Gallery</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+</body>
+</html>`;
+
+  await fs.outputFile(`src/client/${name}/index.html`, indexHtml);
+
+  // Step 2: Create index.tsx
+  const indexTsx = `import { render } from "solid-js/web";
+import ${capitalizedName} from "./${capitalizedName}";
+import "../styles/app.css";
+
+render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+
+  await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
+
+  // Step 3: Create main component with lorem ipsum content
+  const mainComponent = `import {
+  Show,
+  createResource,
+} from "solid-js";
+import { ${capitalizedName}Provider, use${capitalizedName} } from "./${capitalizedName}Context";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarTrigger,
+} from "~/components/ui/sidebar";
+import { Flex } from "~/components/ui/flex";
+import { Separator } from "~/components/ui/separator";
+import { Skeleton } from "~/components/ui/skeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Icon } from "solid-heroicons";
+import { photo } from "solid-heroicons/solid";
+import { ${camelName}ApiClient } from "./${capitalizedName}ApiClient";
+
+function ${capitalizedName}Skeleton() {
+  return (
+    <div class="min-h-screen font-manrope">
+      <SidebarProvider defaultOpen={true}>
+        <Sidebar side="left" variant="sidebar" collapsible="offcanvas">
+          <SidebarHeader class="p-4">
+            <Flex alignItems="center" justifyContent="start" class="gap-3">
+              <Skeleton class="w-8 h-8 rounded" />
+              <div>
+                <Skeleton class="h-5 w-24 mb-1" />
+                <Skeleton class="h-3 w-20" />
+              </div>
+            </Flex>
+          </SidebarHeader>
+          <SidebarContent class="flex-1 p-2">
+            <Skeleton class="h-64 w-full mx-2" />
+          </SidebarContent>
+        </Sidebar>
+        <SidebarInset>
+          <header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger class="-ml-1" />
+            <Separator orientation="vertical" class="mr-2 h-4" />
+            <Skeleton class="h-4 w-32" />
+          </header>
+          <div class="p-6">
+            <Skeleton class="h-64 w-full" />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
+  );
+}
+
+function ${capitalizedName}Content() {
+  const { store } = use${capitalizedName}();
+
+  return (
+    <div class="min-h-screen font-manrope">
+      <SidebarProvider defaultOpen={true}>
+        <Sidebar side="left" variant="sidebar" collapsible="offcanvas">
+          <SidebarHeader class="p-4">
+            <Flex alignItems="center" justifyContent="start" class="gap-3">
+              <Icon path={photo} class="w-8 h-8 text-primary" />
+              <div>
+                <h2 class="text-lg font-semibold">${capitalizedName}</h2>
+                <p class="text-xs text-muted-foreground">Gallery</p>
+              </div>
+            </Flex>
+          </SidebarHeader>
+
+          <SidebarContent class="flex-1 p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle class="text-sm">Gallery Info</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p class="text-xs text-muted-foreground">
+                  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                </p>
+              </CardContent>
+            </Card>
+          </SidebarContent>
+        </Sidebar>
+
+        <SidebarInset>
+          <header class="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger class="-ml-1" />
+            <Separator orientation="vertical" class="mr-2 h-4" />
+            <h1 class="text-sm font-semibold">${capitalizedName}</h1>
+          </header>
+
+          <div class="p-6">
+            <div class="space-y-6">
+              <div>
+                <h2 class="text-3xl font-bold tracking-tight">Gallery Collection</h2>
+                <p class="text-muted-foreground">
+                  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                </p>
+              </div>
+
+              <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Image Gallery 1</CardTitle>
+                    <CardDescription>
+                      Ut enim ad minim veniam
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div class="aspect-video bg-muted rounded-md flex items-center justify-center">
+                      <Icon path={photo} class="w-12 h-12 text-muted-foreground" />
+                    </div>
+                    <p class="text-sm text-muted-foreground mt-4">
+                      Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Image Gallery 2</CardTitle>
+                    <CardDescription>
+                      Duis aute irure dolor
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div class="aspect-video bg-muted rounded-md flex items-center justify-center">
+                      <Icon path={photo} class="w-12 h-12 text-muted-foreground" />
+                    </div>
+                    <p class="text-sm text-muted-foreground mt-4">
+                      In reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Image Gallery 3</CardTitle>
+                    <CardDescription>
+                      Excepteur sint occaecat
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div class="aspect-video bg-muted rounded-md flex items-center justify-center">
+                      <Icon path={photo} class="w-12 h-12 text-muted-foreground" />
+                    </div>
+                    <p class="text-sm text-muted-foreground mt-4">
+                      Cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>About This Gallery</CardTitle>
+                  <CardDescription>
+                    More information about the collection
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p class="text-sm text-muted-foreground">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+                    incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+                    nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore
+                    eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt
+                    in culpa qui officia deserunt mollit anim id est laborum.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
+  );
+}
+
+export default function ${capitalizedName}() {
+  // Load gallery data using createResource (unauthenticated)
+  const [${camelName}Data] = createResource(async () => {
+    try {
+      const data = await ${camelName}ApiClient.load${capitalizedName}();
+      console.log("${capitalizedName} data:", data);
+      return data;
+    } catch (error) {
+      console.error("Failed to load ${name}:", error);
+      throw error;
+    }
+  });
+
+  return (
+    <Show
+      when={!${camelName}Data.loading}
+      fallback={<${capitalizedName}Skeleton />}
+    >
+      <${capitalizedName}Provider initialData={${camelName}Data()!}>
+        <${capitalizedName}Content />
+      </${capitalizedName}Provider>
+    </Show>
+  );
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}.tsx`,
+    mainComponent
+  );
+
+  spinner.succeed("Created main component");
+
+  // Step 4: Create simplified Context (no autosave, no undo/redo, no events)
+  spinner.start("Creating context...");
+
+  const contextFile = `import {
+  createContext,
+  useContext,
+  type JSX,
+} from "solid-js";
+import { createStore } from "solid-js/store";
+import { Load${capitalizedName}Response } from "@shared/types/request-response-schemas";
+
+export interface ${capitalizedName}Store {
+  isLoading: boolean;
+  error: string | null;
+  loadedData: Load${capitalizedName}Response;
+}
+
+interface ${capitalizedName}ContextType {
+  store: ${capitalizedName}Store;
+}
+
+const ${capitalizedName}Context = createContext<${capitalizedName}ContextType>();
+
+export function ${capitalizedName}Provider(props: {
+  children: JSX.Element;
+  initialData: Load${capitalizedName}Response;
+}) {
+  const [store] = createStore<${capitalizedName}Store>({
+    isLoading: false,
+    error: null,
+    loadedData: props.initialData,
+  });
+
+  return (
+    <${capitalizedName}Context.Provider value={{ store }}>
+      {props.children}
+    </${capitalizedName}Context.Provider>
+  );
+}
+
+export function use${capitalizedName}() {
+  const context = useContext(${capitalizedName}Context);
+  if (!context) {
+    throw new Error("use${capitalizedName} must be used within a ${capitalizedName}Provider");
+  }
+  return context;
+}`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}Context.tsx`,
+    contextFile
+  );
+
+  spinner.succeed("Created context");
+
+  // Step 5: Update vite.config.ts
+  spinner.start("Updating vite.config.ts...");
+  await updateViteConfig(name);
+  spinner.succeed("Updated vite.config.ts");
+
+  // Step 6: Create ApiClient file and append types to schemas
+  spinner.start("Creating API client and updating types...");
+
+  const apiClientPath = `src/client/${name}/${capitalizedName}ApiClient.ts`;
+  const relativeImportPath = path
+    .relative(path.dirname(apiClientPath), schemasPath.replace(/\.ts$/, ""))
+    .replace(/\\/g, "/");
+
+  const apiClientFile = `import type {
+  Load${capitalizedName}Response,
+} from "${
+    relativeImportPath.startsWith(".")
+      ? relativeImportPath
+      : "./" + relativeImportPath
+  }";
+
+class ${capitalizedName}ApiClient {
+  private baseUrl = "/api/${name}";
+
+  async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
+    const response = await fetch(\`\${this.baseUrl}/load\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) throw new Error("Failed to load ${name}");
+    return response.json();
+  }
+}
+
+export const ${camelName}ApiClient = new ${capitalizedName}ApiClient();`;
+
+  await fs.outputFile(
+    `src/client/${name}/${capitalizedName}ApiClient.ts`,
+    apiClientFile
+  );
+
+  // Append types to schemas file
+  const typesToAppend = `
+// ${capitalizedName} API Types
+
+export const Load${capitalizedName}RequestSchema = z.object({});
+
+export const Load${capitalizedName}ResponseSchema = z.object({
+  data: z.any(), // Update this with your specific data schema
+  // Add your response properties here
+});
+
+export type Load${capitalizedName}Request = z.infer<typeof Load${capitalizedName}RequestSchema>;
+export type Load${capitalizedName}Response = z.infer<typeof Load${capitalizedName}ResponseSchema>;`;
+
+  if (await fs.pathExists(schemasPath)) {
+    const existingContent = await fs.readFile(schemasPath, "utf8");
+    const updatedContent = existingContent + typesToAppend;
+    await fs.writeFile(schemasPath, updatedContent);
+    spinner.text = "Created API client and updated schemas";
+  } else {
+    // Create the schemas file if it doesn't exist
+    const schemasContent = `import { z } from "zod";
+
+export const ErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  statusCode: z.number(),
+});
+
+export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+${typesToAppend}`;
+
+    await fs.outputFile(schemasPath, schemasContent);
+    spinner.text = "Created API client and schemas file";
+  }
+
+  spinner.succeed("Created API client and updated types");
+
+  // Step 7: Add routes to index.ts
+  await addRoutesToIndex(name, routesPath, spinner);
+
+  // Step 8: Create load endpoint info
+  spinner.start("Creating API integration info...");
+
+  console.log(chalk.yellow("\n📋 Add this to your server:"));
+  console.log(
+    chalk.gray("Add this unauthenticated load endpoint (e.g., src/index.ts):")
+  );
+  console.log(
+    chalk.cyan(`
+app.get("/api/${name}/load", async (c) => {
+  // Load ${name}-specific data (no authentication required)
+  const data = {
+    // Add your public gallery data here
+  };
+
+  return c.json(data);
+});`)
   );
 
   spinner.succeed("API integration info created");

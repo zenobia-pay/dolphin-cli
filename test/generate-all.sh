@@ -38,6 +38,7 @@ node "$CLI_PATH" create-page inventory --type dashboard --yes
 node "$CLI_PATH" create-page analytics --type dashboard --yes
 node "$CLI_PATH" create-page feed --type feed --yes
 node "$CLI_PATH" create-page item --type item --yes
+node "$CLI_PATH" create-page gallery --type gallery --yes
 cd "$SCRIPT_DIR"
 
 # Test 3: Static pages
