@@ -1891,10 +1891,14 @@ ${typesToAppend}`;
 
   spinner.succeed("Created API client and updated types");
 
-  // Step 7: Add routes to index.ts
-  await addRoutesToIndex(name, routesPath, spinner);
+  // Step 7: Add routes to index.ts (gallery-specific: only load, no save)
+  await addGalleryRoutesToIndex(name, routesPath, spinner);
 
-  // Step 8: Create load endpoint info
+  // Step 8: Add UserShard functions (gallery-specific: only load function)
+  const userShardPath = path.join(process.cwd(), "src/server/userShard.ts");
+  await addGalleryUserShardFunctions(name, userShardPath, spinner);
+
+  // Step 9: Create load endpoint info
   spinner.start("Creating API integration info...");
 
   console.log(chalk.yellow("\n📋 Add this to your server:"));
@@ -2075,6 +2079,209 @@ app.post(
 
   await fs.writeFile(routesPath, updatedContent);
   spinner.succeed("Added routes to index.ts");
+}
+
+async function addGalleryRoutesToIndex(
+  name: string,
+  routesPath: string,
+  spinner: any
+) {
+  spinner.start("Adding gallery routes to index.ts...");
+
+  const capitalizedName = toPascalCase(name);
+
+  if (!(await fs.pathExists(routesPath))) {
+    spinner.warn(
+      `Routes file not found at ${routesPath}, skipping route generation`
+    );
+    return;
+  }
+
+  const routesContent = await fs.readFile(routesPath, "utf8");
+
+  // Check if we need to add imports
+  let updatedContent = routesContent;
+
+  // Add schema imports if not present (only Load schemas for gallery)
+  if (!routesContent.includes(`Load${capitalizedName}ResponseSchema`)) {
+    const importMatch = routesContent.match(
+      /import {([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+    );
+    if (importMatch) {
+      const existingImports = importMatch[1].trim();
+      // Remove any trailing commas and clean up
+      const cleanedImports = existingImports.replace(/,\s*$/, "");
+      const newImports = `${cleanedImports},
+  Load${capitalizedName}ResponseSchema`;
+      updatedContent = updatedContent.replace(
+        importMatch[0],
+        `import {${newImports}
+} from "@shared/types/request-response-schemas";`
+      );
+    } else {
+      // Add new import if none exists
+      const firstImportIndex = updatedContent.indexOf("import");
+      if (firstImportIndex !== -1) {
+        const importToAdd = `import {
+  Load${capitalizedName}ResponseSchema,
+} from "@shared/types/request-response-schemas";
+`;
+        updatedContent =
+          updatedContent.slice(0, firstImportIndex) +
+          importToAdd +
+          updatedContent.slice(firstImportIndex);
+      }
+    }
+  }
+
+  // Add only the load route (no save route for gallery)
+  const routesToAdd = `
+// ${capitalizedName} endpoints
+app.get("/api/${name}/load", async (c) => {
+  const user = await getAuthenticatedUser(c);
+  if (!user) {
+    return sendError(c, 401, "Unauthorized");
+  }
+
+  const shardId = c.env.USER_SHARD.idFromName(user.id);
+  const userShard = c.env.USER_SHARD.get(shardId);
+
+  const result = await userShard.load${capitalizedName}(user.id);
+
+  if ("error" in result) {
+    return sendError(c, 500, result.error);
+  }
+
+  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+});
+`;
+
+  // Find the 404 catchall route and add routes before it
+  const catchallIndex = updatedContent.indexOf('app.get("*"');
+  if (catchallIndex !== -1) {
+    updatedContent =
+      updatedContent.slice(0, catchallIndex) +
+      routesToAdd +
+      "\n" +
+      updatedContent.slice(catchallIndex);
+  } else {
+    // If no catchall found, find export default and add before it
+    const exportDefaultIndex = updatedContent.lastIndexOf("export default");
+    if (exportDefaultIndex !== -1) {
+      updatedContent =
+        updatedContent.slice(0, exportDefaultIndex) +
+        routesToAdd +
+        "\n" +
+        updatedContent.slice(exportDefaultIndex);
+    } else {
+      // If no export default, add at the end
+      updatedContent += routesToAdd;
+    }
+  }
+
+  await fs.writeFile(routesPath, updatedContent);
+  spinner.succeed("Added gallery routes to index.ts");
+}
+
+async function addGalleryUserShardFunctions(
+  name: string,
+  userShardPath: string,
+  spinner: any
+) {
+  spinner.start("Adding gallery UserShard functions...");
+
+  const capitalizedName = toPascalCase(name);
+
+  if (!(await fs.pathExists(userShardPath))) {
+    spinner.warn(
+      `UserShard file not found at ${userShardPath}, skipping UserShard generation`
+    );
+    return;
+  }
+
+  const userShardContent = await fs.readFile(userShardPath, "utf8");
+
+  // Add type imports if not present
+  let updatedContent = userShardContent;
+
+  // Add imports from request-response-schemas (only Load for gallery)
+  if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
+    // Find the import block for request-response-schemas and add our types
+    const importMatch = updatedContent.match(
+      /import (?:type )?{([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
+    );
+    if (importMatch) {
+      const existingImports = importMatch[1].trim();
+      // Parse existing imports to avoid duplicates
+      const existingImportsList = existingImports.split(',').map(i => i.trim());
+      const importsToAdd = [`Load${capitalizedName}Response`];
+
+      // Only add ErrorResponse if not already present
+      if (!existingImportsList.includes('ErrorResponse')) {
+        importsToAdd.unshift('ErrorResponse');
+      }
+
+      // Filter out any that already exist
+      const newImportsList = importsToAdd.filter(imp => !existingImportsList.includes(imp));
+
+      if (newImportsList.length > 0) {
+        const cleanedImports = existingImports.replace(/,\s*$/, "");
+        const newImports = `${cleanedImports}, ${newImportsList.join(', ')}`;
+        updatedContent = updatedContent.replace(
+          importMatch[0],
+          `import { ${newImports} } from "@shared/types/request-response-schemas";`
+        );
+      }
+    } else {
+      // Add new import if none exists
+      const firstImportIndex = updatedContent.indexOf("import");
+      if (firstImportIndex !== -1) {
+        const importToAdd = `import { ErrorResponse, Load${capitalizedName}Response } from "@shared/types/request-response-schemas";\n`;
+        updatedContent =
+          updatedContent.slice(0, firstImportIndex) +
+          importToAdd +
+          updatedContent.slice(firstImportIndex);
+      }
+    }
+  }
+
+  // Add only the load function (no save function for gallery)
+  const functionsToAdd = `
+  async load${capitalizedName}(userId: string): Promise<Load${capitalizedName}Response | ErrorResponse> {
+    try {
+      // TODO: Implement load logic for ${name}
+      // Example: Query your schema tables and return data
+      const data = {
+        // Add your data loading logic here
+      };
+
+      return {
+        data,
+        // Add other response fields as needed
+      } as Load${capitalizedName}Response;
+    } catch (error) {
+      console.error("Error loading ${name}:", error);
+      return {
+        error: "Failed to load ${name}",
+        success: false,
+        statusCode: 500,
+      };
+    }
+  }
+`;
+
+  // Find the last method in the class and add our functions before the closing brace
+  const lastBraceIndex = updatedContent.lastIndexOf("}");
+  if (lastBraceIndex !== -1) {
+    updatedContent =
+      updatedContent.slice(0, lastBraceIndex) +
+      functionsToAdd +
+      "\n" +
+      updatedContent.slice(lastBraceIndex);
+  }
+
+  await fs.writeFile(userShardPath, updatedContent);
+  spinner.succeed("Added gallery UserShard functions");
 }
 
 async function addUserShardFunctions(
