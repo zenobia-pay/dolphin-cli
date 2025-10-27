@@ -287,7 +287,8 @@ export const createPageCommand = new Command("create-page")
           name,
           spinner,
           options.schemas,
-          options.routes
+          options.routes,
+          options.userShard
         );
       } else if (options.type === "redirect") {
         await createRedirectPageFlow(
@@ -1511,7 +1512,8 @@ async function createGalleryPageFlow(
   name: string,
   spinner: any,
   schemasPath: string,
-  routesPath: string
+  routesPath: string,
+  userShardPath: string
 ) {
   const capitalizedName = toPascalCase(name);
   const camelName = toCamelCase(name);
@@ -1895,7 +1897,6 @@ ${typesToAppend}`;
   await addGalleryRoutesToIndex(name, routesPath, spinner);
 
   // Step 8: Add UserShard functions (gallery-specific: only load function)
-  const userShardPath = path.join(process.cwd(), "src/server/userShard.ts");
   await addGalleryUserShardFunctions(name, userShardPath, spinner);
 
   // Step 9: Create load endpoint info
@@ -1928,6 +1929,7 @@ async function addRoutesToIndex(
   spinner.start("Adding routes to index.ts...");
 
   const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
 
   if (!(await fs.pathExists(routesPath))) {
     spinner.warn(
@@ -1978,7 +1980,9 @@ async function addRoutesToIndex(
       // Remove any trailing commas and clean up
       const cleanedImports = existingImports.replace(/,\s*$/, "");
       const newImports = `${cleanedImports},
+  Load${capitalizedName}Response,
   Load${capitalizedName}ResponseSchema,
+  Save${capitalizedName}Response,
   Save${capitalizedName}RequestSchema,
   Save${capitalizedName}ResponseSchema`;
       updatedContent = updatedContent.replace(
@@ -1991,7 +1995,9 @@ async function addRoutesToIndex(
       const firstImportIndex = updatedContent.indexOf("import");
       if (firstImportIndex !== -1) {
         const importToAdd = `import {
+  Load${capitalizedName}Response,
   Load${capitalizedName}ResponseSchema,
+  Save${capitalizedName}Response,
   Save${capitalizedName}RequestSchema,
   Save${capitalizedName}ResponseSchema,
 } from "@shared/types/request-response-schemas";
@@ -2004,6 +2010,23 @@ async function addRoutesToIndex(
     }
   }
 
+  // Add event types and handler imports
+  if (!routesContent.includes(`handle${capitalizedName}Change`)) {
+    const firstImportIndex = updatedContent.indexOf("import");
+    if (firstImportIndex !== -1) {
+      const importToAdd = `import {
+  ${capitalizedName}Change,
+  ${capitalizedName}EventResult,
+  handle${capitalizedName}Change,
+} from "@shared/types/${camelName}Events";
+`;
+      updatedContent =
+        updatedContent.slice(0, firstImportIndex) +
+        importToAdd +
+        updatedContent.slice(firstImportIndex);
+    }
+  }
+
   // Add routes before the last route or at the end
   const routesToAdd = `
 // ${capitalizedName} endpoints
@@ -2013,43 +2036,58 @@ app.get("/api/${name}/load", async (c) => {
     return sendError(c, 401, "Unauthorized");
   }
 
-  const shardId = c.env.USER_SHARD.idFromName(user.id);
-  const userShard = c.env.USER_SHARD.get(shardId);
+  // TODO: Implement load logic for ${name}
+  // Example: Query your schema tables and return data
+  const data = {
+    // Add your data loading logic here
+  };
 
-  const result = await userShard.load${capitalizedName}(user.id);
-
-  if ("error" in result) {
-    return sendError(c, 500, result.error);
-  }
-
-  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+  return send(c, Load${capitalizedName}ResponseSchema, {
+    data,
+    // Add other response fields as needed
+  } as Load${capitalizedName}Response, 200);
 });
 
 app.post(
   "/api/${name}/save",
   zValidator("json", Save${capitalizedName}RequestSchema),
   async (c) => {
-    try {
-      const user = await getAuthenticatedUser(c);
-      if (!user) {
-        return sendError(c, 401, "Unauthorized");
-      }
-
-      const { events } = c.req.valid("json");
-
-      const shardId = c.env.USER_SHARD.idFromName(user.id);
-      const userShard = c.env.USER_SHARD.get(shardId);
-
-      const result = await userShard.save${capitalizedName}(user.id, events);
-      if ("error" in result) {
-        return sendError(c, result.statusCode as ContentfulStatusCode, result.error);
-      }
-
-      return send(c, Save${capitalizedName}ResponseSchema, result, 200);
-    } catch (error) {
-      console.error("Error saving ${name}:", error);
-      return sendError(c, 500, "Internal server error");
+    const user = await getAuthenticatedUser(c);
+    if (!user) {
+      return sendError(c, 401, "Unauthorized");
     }
+
+    const { events } = c.req.valid("json");
+
+    const results: ${capitalizedName}EventResult[] = [];
+    let processedCount = 0;
+
+    for (const event of events) {
+      // Server adds persistence metadata
+      const change: ${capitalizedName}Change = {
+        ...event,
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        description: \`\${event.type} event\`,
+      };
+
+      const result = await handle${capitalizedName}Change(
+        c.env.DB,
+        change
+      );
+
+      if (result.success && result.result) {
+        results.push(result.result);
+        processedCount++;
+      }
+    }
+
+    return send(c, Save${capitalizedName}ResponseSchema, {
+      success: true,
+      processedCount,
+      totalChanges: events.length,
+      results,
+    } as Save${capitalizedName}Response, 200);
   }
 );
 `;
@@ -2112,6 +2150,7 @@ async function addGalleryRoutesToIndex(
       // Remove any trailing commas and clean up
       const cleanedImports = existingImports.replace(/,\s*$/, "");
       const newImports = `${cleanedImports},
+  Load${capitalizedName}Response,
   Load${capitalizedName}ResponseSchema`;
       updatedContent = updatedContent.replace(
         importMatch[0],
@@ -2123,6 +2162,7 @@ async function addGalleryRoutesToIndex(
       const firstImportIndex = updatedContent.indexOf("import");
       if (firstImportIndex !== -1) {
         const importToAdd = `import {
+  Load${capitalizedName}Response,
   Load${capitalizedName}ResponseSchema,
 } from "@shared/types/request-response-schemas";
 `;
@@ -2143,16 +2183,16 @@ app.get("/api/${name}/load", async (c) => {
     return sendError(c, 401, "Unauthorized");
   }
 
-  const shardId = c.env.USER_SHARD.idFromName(user.id);
-  const userShard = c.env.USER_SHARD.get(shardId);
+  // TODO: Implement load logic for ${name}
+  // Example: Query your schema tables and return data
+  const data = {
+    // Add your data loading logic here
+  };
 
-  const result = await userShard.load${capitalizedName}(user.id);
-
-  if ("error" in result) {
-    return sendError(c, 500, result.error);
-  }
-
-  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+  return send(c, Load${capitalizedName}ResponseSchema, {
+    data,
+    // Add other response fields as needed
+  } as Load${capitalizedName}Response, 200);
 });
 `;
 
@@ -2188,100 +2228,8 @@ async function addGalleryUserShardFunctions(
   userShardPath: string,
   spinner: any
 ) {
-  spinner.start("Adding gallery UserShard functions...");
-
-  const capitalizedName = toPascalCase(name);
-
-  if (!(await fs.pathExists(userShardPath))) {
-    spinner.warn(
-      `UserShard file not found at ${userShardPath}, skipping UserShard generation`
-    );
-    return;
-  }
-
-  const userShardContent = await fs.readFile(userShardPath, "utf8");
-
-  // Add type imports if not present
-  let updatedContent = userShardContent;
-
-  // Add imports from request-response-schemas (only Load for gallery)
-  if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
-    // Find the import block for request-response-schemas and add our types
-    const importMatch = updatedContent.match(
-      /import (?:type )?{([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
-    );
-    if (importMatch) {
-      const existingImports = importMatch[1].trim();
-      // Parse existing imports to avoid duplicates
-      const existingImportsList = existingImports.split(',').map(i => i.trim());
-      const importsToAdd = [`Load${capitalizedName}Response`];
-
-      // Only add ErrorResponse if not already present
-      if (!existingImportsList.includes('ErrorResponse')) {
-        importsToAdd.unshift('ErrorResponse');
-      }
-
-      // Filter out any that already exist
-      const newImportsList = importsToAdd.filter(imp => !existingImportsList.includes(imp));
-
-      if (newImportsList.length > 0) {
-        const cleanedImports = existingImports.replace(/,\s*$/, "");
-        const newImports = `${cleanedImports}, ${newImportsList.join(', ')}`;
-        updatedContent = updatedContent.replace(
-          importMatch[0],
-          `import { ${newImports} } from "@shared/types/request-response-schemas";`
-        );
-      }
-    } else {
-      // Add new import if none exists
-      const firstImportIndex = updatedContent.indexOf("import");
-      if (firstImportIndex !== -1) {
-        const importToAdd = `import { ErrorResponse, Load${capitalizedName}Response } from "@shared/types/request-response-schemas";\n`;
-        updatedContent =
-          updatedContent.slice(0, firstImportIndex) +
-          importToAdd +
-          updatedContent.slice(firstImportIndex);
-      }
-    }
-  }
-
-  // Add only the load function (no save function for gallery)
-  const functionsToAdd = `
-  async load${capitalizedName}(userId: string): Promise<Load${capitalizedName}Response | ErrorResponse> {
-    try {
-      // TODO: Implement load logic for ${name}
-      // Example: Query your schema tables and return data
-      const data = {
-        // Add your data loading logic here
-      };
-
-      return {
-        data,
-        // Add other response fields as needed
-      } as Load${capitalizedName}Response;
-    } catch (error) {
-      console.error("Error loading ${name}:", error);
-      return {
-        error: "Failed to load ${name}",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-`;
-
-  // Find the last method in the class and add our functions before the closing brace
-  const lastBraceIndex = updatedContent.lastIndexOf("}");
-  if (lastBraceIndex !== -1) {
-    updatedContent =
-      updatedContent.slice(0, lastBraceIndex) +
-      functionsToAdd +
-      "\n" +
-      updatedContent.slice(lastBraceIndex);
-  }
-
-  await fs.writeFile(userShardPath, updatedContent);
-  spinner.succeed("Added gallery UserShard functions");
+  // No longer adding functions to UserShard - logic has moved to route handlers
+  spinner.succeed("Skipped gallery UserShard functions (logic moved to route handlers)");
 }
 
 async function addUserShardFunctions(
@@ -2289,177 +2237,8 @@ async function addUserShardFunctions(
   userShardPath: string,
   spinner: any
 ) {
-  spinner.start("Adding UserShard functions...");
-
-  const capitalizedName = toPascalCase(name);
-  const camelName = toCamelCase(name);
-
-  if (!(await fs.pathExists(userShardPath))) {
-    spinner.warn(
-      `UserShard file not found at ${userShardPath}, skipping UserShard generation`
-    );
-    return;
-  }
-
-  const userShardContent = await fs.readFile(userShardPath, "utf8");
-
-  // Add type imports if not present
-  let updatedContent = userShardContent;
-
-  // Add imports from request-response-schemas
-  if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
-    // Find the import block for request-response-schemas and add our types
-    const importMatch = updatedContent.match(
-      /import (?:type )?{([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
-    );
-    if (importMatch) {
-      const existingImports = importMatch[1].trim();
-      // Parse existing imports to avoid duplicates
-      const existingImportsList = existingImports.split(',').map(i => i.trim());
-      const importsToAdd = [`Load${capitalizedName}Response`, `Save${capitalizedName}Response`];
-
-      // Only add ErrorResponse if not already present
-      if (!existingImportsList.includes('ErrorResponse')) {
-        importsToAdd.unshift('ErrorResponse');
-      }
-
-      // Filter out any that already exist
-      const newImportsList = importsToAdd.filter(imp => !existingImportsList.includes(imp));
-
-      if (newImportsList.length > 0) {
-        const cleanedImports = existingImports.replace(/,\s*$/, "");
-        const newImports = `${cleanedImports}, ${newImportsList.join(', ')}`;
-        updatedContent = updatedContent.replace(
-          importMatch[0],
-          `import { ${newImports} } from "@shared/types/request-response-schemas";`
-        );
-      }
-    } else {
-      // Add new import if none exists
-      const firstImportIndex = updatedContent.indexOf("import");
-      if (firstImportIndex !== -1) {
-        const importToAdd = `import { ErrorResponse, Load${capitalizedName}Response, Save${capitalizedName}Response } from "@shared/types/request-response-schemas";\n`;
-        updatedContent =
-          updatedContent.slice(0, firstImportIndex) +
-          importToAdd +
-          updatedContent.slice(firstImportIndex);
-      }
-    }
-  }
-
-  // Add imports from events file
-  if (!updatedContent.includes(`${capitalizedName}Event`)) {
-    const eventsImportMatch = updatedContent.match(
-      /import (?:type )?{([^}]+)} from ["']@shared\/types\/${camelName}Events["'];/
-    );
-    if (eventsImportMatch) {
-      const existingImports = eventsImportMatch[1].trim();
-      const cleanedImports = existingImports.replace(/,\s*$/, "");
-      const newImports = `${cleanedImports}, ${capitalizedName}Event, ${capitalizedName}Change, ${capitalizedName}EventResult, handle${capitalizedName}Change`;
-      updatedContent = updatedContent.replace(
-        eventsImportMatch[0],
-        `import { ${newImports} } from "@shared/types/${camelName}Events";`
-      );
-    } else {
-      // Add new import after the request-response-schemas import
-      const schemasImportIndex = updatedContent.indexOf("@shared/types/request-response-schemas");
-      if (schemasImportIndex !== -1) {
-        const lineEndIndex = updatedContent.indexOf("\n", schemasImportIndex);
-        const importToAdd = `\nimport { ${capitalizedName}Event, ${capitalizedName}Change, ${capitalizedName}EventResult, handle${capitalizedName}Change } from "@shared/types/${camelName}Events";`;
-        updatedContent =
-          updatedContent.slice(0, lineEndIndex) +
-          importToAdd +
-          updatedContent.slice(lineEndIndex);
-      }
-    }
-  }
-
-  // Add the load and save functions before the closing brace of the class
-  const functionsToAdd = `
-  async load${capitalizedName}(userId: string): Promise<Load${capitalizedName}Response | ErrorResponse> {
-    try {
-      // TODO: Implement load logic for ${name}
-      // Example: Query your schema tables and return data
-      const data = {
-        // Add your data loading logic here
-      };
-
-      return {
-        data,
-        // Add other response fields as needed
-      } as Load${capitalizedName}Response;
-    } catch (error) {
-      console.error("Error loading ${name}:", error);
-      return {
-        error: "Failed to load ${name}",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-
-  async save${capitalizedName}(
-    userId: string,
-    events: ${capitalizedName}Event[]
-  ): Promise<Save${capitalizedName}Response | ErrorResponse> {
-    try {
-      const results: ${capitalizedName}EventResult[] = [];
-      let processedCount = 0;
-
-      for (const event of events) {
-        try {
-          // Server adds persistence metadata
-          const change: ${capitalizedName}Change = {
-            ...event,
-            id: crypto.randomUUID(),
-            timestamp: Date.now(),
-            description: \`\${event.type} event\`,
-          };
-
-          const result = await handle${capitalizedName}Change(
-            this.env.DB,
-            this.shardDb,
-            change
-          );
-
-          if (result.success && result.result) {
-            results.push(result.result);
-            processedCount++;
-          }
-        } catch (error) {
-          console.error("Error processing ${name} event:", error, event);
-        }
-      }
-
-      return {
-        success: true,
-        processedCount,
-        totalChanges: events.length,
-        results,
-      } as Save${capitalizedName}Response;
-    } catch (error) {
-      console.error("Error saving ${name}:", error);
-      return {
-        error: "Failed to save ${name} changes",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-`;
-
-  // Find the last method in the class and add our functions before the closing brace
-  const lastBraceIndex = updatedContent.lastIndexOf("}");
-  if (lastBraceIndex !== -1) {
-    updatedContent =
-      updatedContent.slice(0, lastBraceIndex) +
-      functionsToAdd +
-      "\n" +
-      updatedContent.slice(lastBraceIndex);
-  }
-
-  await fs.writeFile(userShardPath, updatedContent);
-  spinner.succeed("Added UserShard functions");
+  // No longer adding functions to UserShard - logic has moved to route handlers
+  spinner.succeed("Skipped UserShard functions (logic moved to route handlers)");
 }
 
 async function createEventsFile(name: string, spinner: any) {
@@ -2469,9 +2248,7 @@ async function createEventsFile(name: string, spinner: any) {
   const camelName = toCamelCase(name);
   const snakeName = toScreamingSnakeCase(name);
 
-  const eventsContent = `import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-import type * as userShardSchema from "~/db/userShard.schema";
-import type * as schema from "~/db/schema";
+  const eventsContent = `import type * as schema from "~/db/schema";
 
 // ===== EVENT TYPES (what client sends) =====
 export type Sample${capitalizedName}Event = {
@@ -2523,7 +2300,6 @@ export type ${capitalizedName}ChangeType = ${capitalizedName}Change["type"];
 
 export type ${capitalizedName}ChangeHandler<T extends ${capitalizedName}Event> = (
   db: D1Database,
-  userShardDb: DrizzleSqliteDODatabase<typeof userShardSchema>,
   change: T & PersistenceMetadata
 ) => Promise<{ success: boolean; result?: ResultForEvent<T> }>;
 
@@ -2532,13 +2308,12 @@ export type AssertNever = (x: never) => never;
 // ===== HANDLER IMPLEMENTATION =====
 export async function handle${capitalizedName}Change(
   db: D1Database,
-  userShardDb: DrizzleSqliteDODatabase<typeof userShardSchema>,
   change: ${capitalizedName}Change
 ): Promise<{ success: boolean; result?: ${capitalizedName}EventResult }> {
   switch (change.type) {
     case "SAMPLE_${snakeName}_EVENT": {
       // TODO: Implement handler logic
-      // Example: await userShardDb.insert(someTable).values({ ... });
+      // Example: await db.prepare("INSERT INTO ...").bind(...).run();
 
       return {
         success: true,
@@ -3429,6 +3204,7 @@ async function addItemRoutesToIndex(
   spinner.start("Adding routes to index.ts...");
 
   const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
 
   if (!(await fs.pathExists(routesPath))) {
     spinner.warn(
@@ -3476,7 +3252,7 @@ async function addItemRoutesToIndex(
     );
     if (importMatch) {
       const existingImports = importMatch[1].trim();
-      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Load${capitalizedName}ResponseSchema,\n  Save${capitalizedName}RequestSchema,\n  Save${capitalizedName}ResponseSchema`;
+      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Load${capitalizedName}Response,\n  Load${capitalizedName}ResponseSchema,\n  Save${capitalizedName}Response,\n  Save${capitalizedName}RequestSchema,\n  Save${capitalizedName}ResponseSchema`;
       updatedContent = updatedContent.replace(
         importMatch[0],
         `import {${newImports}} from "@shared/types/request-response-schemas";`
@@ -3487,9 +3263,21 @@ async function addItemRoutesToIndex(
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
-          `import { Load${capitalizedName}ResponseSchema, Save${capitalizedName}RequestSchema, Save${capitalizedName}ResponseSchema } from "@shared/types/request-response-schemas";\n` +
+          `import { Load${capitalizedName}Response, Load${capitalizedName}ResponseSchema, Save${capitalizedName}Response, Save${capitalizedName}RequestSchema, Save${capitalizedName}ResponseSchema } from "@shared/types/request-response-schemas";\n` +
           updatedContent.slice(firstImportEnd + 1);
       }
+    }
+  }
+
+  // Add event types import
+  if (!routesContent.includes(`${capitalizedName}EventResult`)) {
+    const firstImportIndex = updatedContent.indexOf("import");
+    if (firstImportIndex !== -1) {
+      const importToAdd = `import { ${capitalizedName}EventResult } from "@shared/types/${camelName}Events";\n`;
+      updatedContent =
+        updatedContent.slice(0, firstImportIndex) +
+        importToAdd +
+        updatedContent.slice(firstImportIndex);
     }
   }
 
@@ -3509,16 +3297,17 @@ app.get("/api/${name}/load", async (c) => {
     return sendError(c, 400, "Missing id parameter");
   }
 
-  const shardId = c.env.USER_SHARD.idFromName(user.id);
-  const userShard = c.env.USER_SHARD.get(shardId);
+  // TODO: Implement load logic for ${name} with id parameter
+  // Example: Query your schema tables using the id and return data
+  const data = {
+    // Add your data loading logic here
+    // Use the id parameter to fetch specific item
+  };
 
-  const result = await userShard.load${capitalizedName}(user.id, id);
-
-  if ("error" in result) {
-    return sendError(c, 500, result.error);
-  }
-
-  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+  return send(c, Load${capitalizedName}ResponseSchema, {
+    data,
+    // Add other response fields as needed
+  } as Load${capitalizedName}Response, 200);
 });
 
 app.post(
@@ -3532,16 +3321,33 @@ app.post(
 
     const { events } = c.req.valid("json");
 
-    const shardId = c.env.USER_SHARD.idFromName(user.id);
-    const userShard = c.env.USER_SHARD.get(shardId);
+    const results: ${capitalizedName}EventResult[] = [];
+    let processedCount = 0;
 
-    const result = await userShard.save${capitalizedName}(user.id, events);
-
-    if ("error" in result) {
-      return sendError(c, 500, result.error);
+    for (const event of events) {
+      // TODO: Process each event and update your data
+      // Example event processing:
+      switch (event.type) {
+        case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
+          // Process the event
+          processedCount++;
+          results.push({
+            type: event.type,
+            // Add result data
+          } as ${capitalizedName}EventResult);
+          break;
+        }
+        default:
+          console.warn("Unknown ${name} event type:", event);
+      }
     }
 
-    return send(c, Save${capitalizedName}ResponseSchema, result, 200);
+    return send(c, Save${capitalizedName}ResponseSchema, {
+      success: true,
+      processedCount,
+      totalChanges: processedCount,
+      results,
+    } as Save${capitalizedName}Response, 200);
   }
 );
 
@@ -3562,143 +3368,8 @@ async function addItemUserShardFunctions(
   userShardPath: string,
   spinner: any
 ) {
-  spinner.start("Adding UserShard functions...");
-
-  const capitalizedName = toPascalCase(name);
-  const camelName = toCamelCase(name);
-
-  if (!(await fs.pathExists(userShardPath))) {
-    spinner.warn(
-      `UserShard file not found at ${userShardPath}, skipping UserShard function generation`
-    );
-    return;
-  }
-
-  const userShardContent = await fs.readFile(userShardPath, "utf8");
-
-  // Add import for types
-  let updatedContent = userShardContent;
-
-  if (!userShardContent.includes(`Load${capitalizedName}Response`)) {
-    const importMatch = userShardContent.match(
-      /import\s+type\s+{([^}]+)}\s+from\s+["']@shared\/types\/request-response-schemas["'];?/
-    );
-
-    if (importMatch) {
-      const existingImports = importMatch[1].trim();
-      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Load${capitalizedName}Response,\n  Save${capitalizedName}Response,\n  ErrorResponse`;
-      updatedContent = updatedContent.replace(
-        importMatch[0],
-        `import type {${newImports}} from "@shared/types/request-response-schemas";`
-      );
-    } else {
-      // Add the import if it doesn't exist
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
-      if (firstImportEnd !== -1) {
-        updatedContent =
-          updatedContent.slice(0, firstImportEnd + 1) +
-          `import type { Load${capitalizedName}Response, Save${capitalizedName}Response, ErrorResponse } from "@shared/types/request-response-schemas";\n` +
-          updatedContent.slice(firstImportEnd + 1);
-      }
-    }
-  }
-
-  // Add event import
-  if (!userShardContent.includes(`${capitalizedName}Event`)) {
-    const eventImportMatch = updatedContent.match(
-      /import\s+type\s+{([^}]+)}\s+from\s+["']@shared\/types\/${camelName}Events["'];?/
-    );
-
-    if (!eventImportMatch) {
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
-      if (firstImportEnd !== -1) {
-        updatedContent =
-          updatedContent.slice(0, firstImportEnd + 1) +
-          `import type { ${capitalizedName}Event, ${capitalizedName}EventResult } from "@shared/types/${camelName}Events";\n` +
-          updatedContent.slice(firstImportEnd + 1);
-      }
-    }
-  }
-
-  // Add the functions before the last closing brace of the class
-  const functionsToAdd = `
-  async load${capitalizedName}(userId: string, id: string): Promise<Load${capitalizedName}Response | ErrorResponse> {
-    try {
-      // TODO: Implement load logic for ${name} with id parameter
-      // Example: Query your schema tables using the id and return data
-      const data = {
-        // Add your data loading logic here
-        // Use the id parameter to fetch specific item
-      };
-
-      return {
-        data,
-        // Add other response fields as needed
-      } as Load${capitalizedName}Response;
-    } catch (error) {
-      console.error("Error loading ${name}:", error);
-      return {
-        error: "Failed to load ${name}",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-
-  async save${capitalizedName}(
-    userId: string,
-    events: ${capitalizedName}Event[]
-  ): Promise<Save${capitalizedName}Response | ErrorResponse> {
-    try {
-      const results: ${capitalizedName}EventResult[] = [];
-      let processedCount = 0;
-
-      for (const event of events) {
-        // TODO: Process each event and update your data
-        // Example event processing:
-        switch (event.type) {
-          case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
-            // Process the event
-            processedCount++;
-            results.push({
-              type: event.type,
-              // Add result data
-            } as ${capitalizedName}EventResult);
-            break;
-          }
-          default:
-            console.warn("Unknown ${name} event type:", event);
-        }
-      }
-
-      return {
-        success: true,
-        processedCount,
-        totalChanges: processedCount,
-        results,
-      };
-    } catch (error) {
-      console.error("Error saving ${name}:", error);
-      return {
-        error: "Failed to save ${name}",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-`;
-
-  // Find the last closing brace of the class
-  const lastClosingBrace = updatedContent.lastIndexOf('}');
-  if (lastClosingBrace !== -1) {
-    updatedContent =
-      updatedContent.slice(0, lastClosingBrace) +
-      functionsToAdd +
-      updatedContent.slice(lastClosingBrace);
-  }
-
-  await fs.writeFile(userShardPath, updatedContent);
-  spinner.succeed("Added UserShard functions");
+  // No longer adding functions to UserShard - logic has moved to route handlers
+  spinner.succeed("Skipped item UserShard functions (logic moved to route handlers)");
 }
 
 async function addRedirectRoutesToIndex(
@@ -3789,14 +3460,12 @@ app.get("/api/${name}/code", async (c) => {
     return sendError(c, 400, "Missing code parameter");
   }
 
-  const shardId = c.env.USER_SHARD.idFromName(user.id);
-  const userShard = c.env.USER_SHARD.get(shardId);
-
-  const result = await userShard.process${capitalizedName}Code(user.id, code);
-
-  if ("error" in result) {
-    return sendError(c, 500, result.error);
-  }
+  // TODO: Implement your redirect code processing logic here
+  // For example, exchange the code for an access token from an OAuth provider
+  const result = {
+    success: true,
+    // Add your response data here
+  };
 
   return send(c, Process${capitalizedName}CodeResponseSchema, result, 200);
 });
@@ -3818,92 +3487,8 @@ async function addRedirectUserShardFunctions(
   userShardPath: string,
   spinner: any
 ) {
-  spinner.start("Adding UserShard functions...");
-
-  const capitalizedName = toPascalCase(name);
-
-  if (!(await fs.pathExists(userShardPath))) {
-    spinner.warn(
-      `UserShard file not found at ${userShardPath}, skipping UserShard function generation`
-    );
-    return;
-  }
-
-  const userShardContent = await fs.readFile(userShardPath, "utf8");
-
-  // Add import for types
-  let updatedContent = userShardContent;
-
-  if (!userShardContent.includes(`Process${capitalizedName}CodeResponse`)) {
-    const importMatch = userShardContent.match(
-      /import\s+type\s+{([^}]+)}\s+from\s+["']@shared\/types\/request-response-schemas["'];?/
-    );
-
-    if (importMatch) {
-      const existingImports = importMatch[1].trim();
-      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Process${capitalizedName}CodeResponse,\n  ErrorResponse`;
-      updatedContent = updatedContent.replace(
-        importMatch[0],
-        `import type {${newImports}} from "@shared/types/request-response-schemas";`
-      );
-    } else {
-      // Add the import if it doesn't exist
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
-      if (firstImportEnd !== -1) {
-        updatedContent =
-          updatedContent.slice(0, firstImportEnd + 1) +
-          `import type { Process${capitalizedName}CodeResponse, ErrorResponse } from "@shared/types/request-response-schemas";\n` +
-          updatedContent.slice(firstImportEnd + 1);
-      }
-    }
-  }
-
-  // Add the function before the last closing brace of the class
-  const functionsToAdd = `
-  async process${capitalizedName}Code(userId: string, code: string): Promise<Process${capitalizedName}CodeResponse | ErrorResponse> {
-    try {
-      // TODO: Implement code processing logic for ${name}
-      // Example: Validate the code and determine redirect URL
-      // This could be used for subscription success, invite links, etc.
-
-      // Example implementation:
-      // const validCode = await this.validateCode(code);
-      // if (!validCode) {
-      //   return {
-      //     error: "Invalid code",
-      //     success: false,
-      //     statusCode: 400,
-      //   };
-      // }
-
-      const redirectUrl = "/dashboard"; // Replace with your logic
-
-      return {
-        redirectUrl,
-        // Add other response fields as needed
-      } as Process${capitalizedName}CodeResponse;
-    } catch (error) {
-      console.error("Error processing ${name} code:", error);
-      return {
-        error: "Failed to process ${name} code",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-`;
-
-  // Find the last closing brace of the class
-  const lastClosingBrace = updatedContent.lastIndexOf('}');
-  if (lastClosingBrace !== -1) {
-    updatedContent =
-      updatedContent.slice(0, lastClosingBrace) +
-      functionsToAdd +
-      updatedContent.slice(lastClosingBrace);
-  }
-
-  await fs.writeFile(userShardPath, updatedContent);
-  spinner.succeed("Added UserShard functions");
+  // No longer adding functions to UserShard - logic has moved to route handlers
+  spinner.succeed("Skipped redirect UserShard functions (logic moved to route handlers)");
 }
 
 async function createFeedPageFlow(
@@ -4791,6 +4376,7 @@ async function addFeedRoutesToIndex(
   spinner.start("Adding routes to index.ts...");
 
   const capitalizedName = toPascalCase(name);
+  const camelName = toCamelCase(name);
 
   if (!(await fs.pathExists(routesPath))) {
     spinner.warn(
@@ -4841,7 +4427,9 @@ async function addFeedRoutesToIndex(
       // Remove any trailing commas and clean up
       const cleanedImports = existingImports.replace(/,\s*$/, "");
       const newImports = `${cleanedImports},
+  Load${capitalizedName}Response,
   Load${capitalizedName}ResponseSchema,
+  Save${capitalizedName}Response,
   Save${capitalizedName}RequestSchema,
   Save${capitalizedName}ResponseSchema`;
       updatedContent = updatedContent.replace(
@@ -4854,7 +4442,9 @@ async function addFeedRoutesToIndex(
       const firstImportIndex = updatedContent.indexOf("import");
       if (firstImportIndex !== -1) {
         const importToAdd = `import {
+  Load${capitalizedName}Response,
   Load${capitalizedName}ResponseSchema,
+  Save${capitalizedName}Response,
   Save${capitalizedName}RequestSchema,
   Save${capitalizedName}ResponseSchema,
 } from "@shared/types/request-response-schemas";
@@ -4867,6 +4457,23 @@ async function addFeedRoutesToIndex(
     }
   }
 
+  // Add event types and handler imports
+  if (!routesContent.includes(`handle${capitalizedName}Change`)) {
+    const firstImportIndex = updatedContent.indexOf("import");
+    if (firstImportIndex !== -1) {
+      const importToAdd = `import {
+  ${capitalizedName}Change,
+  ${capitalizedName}EventResult,
+  handle${capitalizedName}Change,
+} from "@shared/types/${camelName}Events";
+`;
+      updatedContent =
+        updatedContent.slice(0, firstImportIndex) +
+        importToAdd +
+        updatedContent.slice(firstImportIndex);
+    }
+  }
+
   // Add routes before the last route or at the end
   const routesToAdd = `
 // ${capitalizedName} endpoints
@@ -4876,50 +4483,55 @@ app.get("/api/${name}/load", async (c) => {
     return sendError(c, 401, "Unauthorized");
   }
 
-  const shardId = c.env.USER_SHARD.idFromName(user.id);
-  const userShard = c.env.USER_SHARD.get(shardId);
+  const continuationToken = c.req.query("continuationToken");
 
-  const result = await userShard.load${capitalizedName}(
-    user.id,
-    c.req.query("continuationToken")
-  );
-
-  if ("error" in result) {
-    return sendError(c, 500, result.error);
-  }
-
-  return send(c, Load${capitalizedName}ResponseSchema, result, 200);
+  // TODO: Implement your feed algorithm here
+  return send(c, Load${capitalizedName}ResponseSchema, {
+    feedData: [],
+    continuationToken: undefined,
+  } as Load${capitalizedName}Response, 200);
 });
 
 app.post(
   "/api/${name}/save",
   zValidator("json", Save${capitalizedName}RequestSchema),
   async (c) => {
-    try {
-      const user = await getAuthenticatedUser(c);
-      if (!user) {
-        return sendError(c, 401, "Unauthorized");
-      }
-
-      const { events } = c.req.valid("json");
-
-      const shardId = c.env.USER_SHARD.idFromName(user.id);
-      const userShard = c.env.USER_SHARD.get(shardId);
-
-      const result = await userShard.save${capitalizedName}(user.id, events);
-      if ("error" in result) {
-        return sendError(
-          c,
-          result.statusCode as ContentfulStatusCode,
-          result.error
-        );
-      }
-
-      return send(c, Save${capitalizedName}ResponseSchema, result, 200);
-    } catch (error) {
-      console.error("Error saving ${name}:", error);
-      return sendError(c, 500, "Internal server error");
+    const user = await getAuthenticatedUser(c);
+    if (!user) {
+      return sendError(c, 401, "Unauthorized");
     }
+
+    const { events } = c.req.valid("json");
+
+    const results: ${capitalizedName}EventResult[] = [];
+    let processedCount = 0;
+
+    for (const event of events) {
+      // Server adds persistence metadata
+      const change: ${capitalizedName}Change = {
+        ...event,
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        description: \`\${event.type} event\`,
+      };
+
+      const result = await handle${capitalizedName}Change(
+        c.env.DB,
+        change
+      );
+
+      if (result.success && result.result) {
+        results.push(result.result);
+        processedCount++;
+      }
+    }
+
+    return send(c, Save${capitalizedName}ResponseSchema, {
+      success: true,
+      processedCount,
+      totalChanges: events.length,
+      results,
+    } as Save${capitalizedName}Response, 200);
   }
 );
 `;
@@ -4956,176 +4568,8 @@ async function addFeedUserShardFunctions(
   userShardPath: string,
   spinner: any
 ) {
-  spinner.start("Adding UserShard functions...");
-
-  const capitalizedName = toPascalCase(name);
-  const camelName = toCamelCase(name);
-
-  if (!(await fs.pathExists(userShardPath))) {
-    spinner.warn(
-      `UserShard file not found at ${userShardPath}, skipping UserShard generation`
-    );
-    return;
-  }
-
-  const userShardContent = await fs.readFile(userShardPath, "utf8");
-
-  // Add type imports if not present
-  let updatedContent = userShardContent;
-
-  // Add imports from request-response-schemas
-  if (!updatedContent.includes(`Load${capitalizedName}Response`)) {
-    // Find the import block for request-response-schemas and add our types
-    const importMatch = updatedContent.match(
-      /import (?:type )?{([^}]+)} from ["']@shared\/types\/request-response-schemas["'];/
-    );
-    if (importMatch) {
-      const existingImports = importMatch[1].trim();
-      // Parse existing imports to avoid duplicates
-      const existingImportsList = existingImports.split(',').map(i => i.trim());
-      const importsToAdd = [`Load${capitalizedName}Response`, `Save${capitalizedName}Response`];
-
-      // Only add ErrorResponse if not already present
-      if (!existingImportsList.includes('ErrorResponse')) {
-        importsToAdd.unshift('ErrorResponse');
-      }
-
-      // Filter out any that already exist
-      const newImportsList = importsToAdd.filter(imp => !existingImportsList.includes(imp));
-
-      if (newImportsList.length > 0) {
-        const cleanedImports = existingImports.replace(/,\s*$/, "");
-        const newImports = `${cleanedImports}, ${newImportsList.join(', ')}`;
-        updatedContent = updatedContent.replace(
-          importMatch[0],
-          `import { ${newImports} } from "@shared/types/request-response-schemas";`
-        );
-      }
-    } else {
-      // Add new import if none exists
-      const firstImportIndex = updatedContent.indexOf("import");
-      if (firstImportIndex !== -1) {
-        const importToAdd = `import { ErrorResponse, Load${capitalizedName}Response, Save${capitalizedName}Response } from "@shared/types/request-response-schemas";\n`;
-        updatedContent =
-          updatedContent.slice(0, firstImportIndex) +
-          importToAdd +
-          updatedContent.slice(firstImportIndex);
-      }
-    }
-  }
-
-  // Add imports from events file
-  if (!updatedContent.includes(`${capitalizedName}Event`)) {
-    const eventsImportRegex = new RegExp(
-      `import (?:type )?{([^}]+)} from ["']@shared\\/types\\/${camelName}Events["'];`
-    );
-    const eventsImportMatch = updatedContent.match(eventsImportRegex);
-    if (eventsImportMatch) {
-      const existingImports = eventsImportMatch[1].trim();
-      const cleanedImports = existingImports.replace(/,\s*$/, "");
-      const newImports = `${cleanedImports}, ${capitalizedName}Event, ${capitalizedName}Change, ${capitalizedName}EventResult, handle${capitalizedName}Change`;
-      updatedContent = updatedContent.replace(
-        eventsImportMatch[0],
-        `import { ${newImports} } from "@shared/types/${camelName}Events";`
-      );
-    } else {
-      // Add new import after the request-response-schemas import
-      const schemasImportIndex = updatedContent.indexOf("@shared/types/request-response-schemas");
-      if (schemasImportIndex !== -1) {
-        const lineEndIndex = updatedContent.indexOf("\n", schemasImportIndex);
-        const importToAdd = `\nimport { ${capitalizedName}Event, ${capitalizedName}Change, ${capitalizedName}EventResult, handle${capitalizedName}Change } from "@shared/types/${camelName}Events";`;
-        updatedContent =
-          updatedContent.slice(0, lineEndIndex) +
-          importToAdd +
-          updatedContent.slice(lineEndIndex);
-      }
-    }
-  }
-
-  // Add the load and save functions before the closing brace of the class
-  const functionsToAdd = `
-  async load${capitalizedName}(
-    userId: string,
-    continuationToken?: string
-  ): Promise<Load${capitalizedName}Response | ErrorResponse> {
-    try {
-      // TODO: Implement your feed algorithm here
-      return {
-        feedData: [],
-        continuationToken: undefined,
-      };
-    } catch (error) {
-      console.error("Error loading ${name}:", error);
-      return {
-        error: "Failed to load ${name}",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-
-  async save${capitalizedName}(
-    userId: string,
-    events: ${capitalizedName}Event[]
-  ): Promise<Save${capitalizedName}Response | ErrorResponse> {
-    try {
-      const results: ${capitalizedName}EventResult[] = [];
-      let processedCount = 0;
-
-      for (const event of events) {
-        try {
-          // Server adds persistence metadata
-          const change: ${capitalizedName}Change = {
-            ...event,
-            id: crypto.randomUUID(),
-            timestamp: Date.now(),
-            description: \`\${event.type} event\`,
-          };
-
-          const result = await handle${capitalizedName}Change(
-            this.env.DB,
-            this.shardDb,
-            change
-          );
-
-          if (result.success && result.result) {
-            results.push(result.result);
-            processedCount++;
-          }
-        } catch (error) {
-          console.error("Error processing feed event:", error, event);
-        }
-      }
-
-      return {
-        success: true,
-        processedCount,
-        totalChanges: events.length,
-        results,
-      } as Save${capitalizedName}Response;
-    } catch (error) {
-      console.error("Error saving feed:", error);
-      return {
-        error: "Failed to save feed changes",
-        success: false,
-        statusCode: 500,
-      };
-    }
-  }
-`;
-
-  // Find the last method in the class and add our functions before the closing brace
-  const lastBraceIndex = updatedContent.lastIndexOf("}");
-  if (lastBraceIndex !== -1) {
-    updatedContent =
-      updatedContent.slice(0, lastBraceIndex) +
-      functionsToAdd +
-      "\n" +
-      updatedContent.slice(lastBraceIndex);
-  }
-
-  await fs.writeFile(userShardPath, updatedContent);
-  spinner.succeed("Added UserShard functions");
+  // No longer adding functions to UserShard - logic has moved to route handlers
+  spinner.succeed("Skipped feed UserShard functions (logic moved to route handlers)");
 }
 
 async function createFeedEventsFile(name: string, spinner: any) {
@@ -5135,9 +4579,7 @@ async function createFeedEventsFile(name: string, spinner: any) {
   const camelName = toCamelCase(name);
   const snakeName = toScreamingSnakeCase(name);
 
-  const eventsContent = `import type { DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-import type * as userShardSchema from "~/db/userShard.schema";
-import type * as schema from "~/db/schema";
+  const eventsContent = `import type * as schema from "~/db/schema";
 
 // ===== EVENT TYPES (what client sends) =====
 export type Sample${capitalizedName}Event = {
@@ -5189,7 +4631,6 @@ export type ${capitalizedName}ChangeType = ${capitalizedName}Change["type"];
 
 export type ${capitalizedName}ChangeHandler<T extends ${capitalizedName}Event> = (
   db: D1Database,
-  userShardDb: DrizzleSqliteDODatabase<typeof userShardSchema>,
   change: T & PersistenceMetadata
 ) => Promise<{ success: boolean; result?: ResultForEvent<T> }>;
 
@@ -5198,13 +4639,12 @@ export type AssertNever = (x: never) => never;
 // ===== HANDLER IMPLEMENTATION =====
 export async function handle${capitalizedName}Change(
   db: D1Database,
-  userShardDb: DrizzleSqliteDODatabase<typeof userShardSchema>,
   change: ${capitalizedName}Change
 ): Promise<{ success: boolean; result?: ${capitalizedName}EventResult }> {
   switch (change.type) {
     case "SAMPLE_${snakeName}_EVENT": {
       // TODO: Implement handler logic
-      // Example: await userShardDb.insert(someTable).values({ ... });
+      // Example: await db.prepare("INSERT INTO ...").bind(...).run();
 
       return {
         success: true,
