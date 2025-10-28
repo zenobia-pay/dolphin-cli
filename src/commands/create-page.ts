@@ -80,9 +80,15 @@ function toScreamingSnakeCase(name: string): string {
 }
 
 export const createPageCommand = new Command("create-page")
-  .description("Create a new static, dashboard, feed, item, gallery, or redirect page")
+  .description(
+    "Create a new static, dashboard, feed, item, gallery, or redirect page"
+  )
   .argument("<name>", 'Name of the page (e.g., "about", "pricing", "feed")')
-  .option("-t, --type <type>", "Page type (static, dashboard, feed, item, gallery, redirect)", "static")
+  .option(
+    "-t, --type <type>",
+    "Page type (static, dashboard, feed, item, gallery, redirect)",
+    "static"
+  )
   .option(
     "-s, --schemas <path>",
     "Path to request-response-schemas file",
@@ -578,7 +584,10 @@ async function createStaticPageFlow(name: string, spinner: any) {
   await fs.outputFile(`src/client/${name}/index.html`, staticHtml);
   spinner.succeed("Created static HTML page");
 
-  // Step 2: Update vite.config.ts
+  // Step 2: Create PAGE.md
+  await createPageMd(name, "static");
+
+  // Step 3: Update vite.config.ts
   spinner.start("Updating vite.config.ts...");
   await updateViteConfig(name);
   spinner.succeed("Updated vite.config.ts");
@@ -616,9 +625,18 @@ async function createDashboardPageFlow(
   // Step 2: Create index.tsx (simple entry point)
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
+import { Toaster } from "~/components/ui/toast";
 import "../styles/app.css";
 
-render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+render(
+  () => (
+    <>
+      <${capitalizedName} />
+      <Toaster />
+    </>
+  ),
+  document.getElementById("root")!
+);`;
 
   await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
 
@@ -1180,7 +1198,6 @@ export function process${capitalizedName}EventResult(
     eventProcessor
   );
 
-
   spinner.succeed("Created context, event processor, and views");
 
   // Step 7: Update vite.config.ts
@@ -1207,33 +1224,56 @@ export function process${capitalizedName}EventResult(
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
-    const response = await fetch(\`\${this.baseUrl}/load\`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+  private handleError(error: unknown, context: string): never {
+    const errorMessage =
+      error instanceof Error ? error.message : "Network error";
+    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+    showToast({
+      title: "Network Error",
+      description: \`\${context}: \${errorMessage}\`,
+      variant: "destructive",
     });
 
-    if (!response.ok) throw new Error("Failed to load ${name}");
-    return response.json();
+    throw error;
+  }
+
+  async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
+    try {
+      const response = await fetch(\`\${this.baseUrl}/load\`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to load ${name}");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to load ${name}");
+    }
   }
 
   async save${capitalizedName}(
     request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
-    const response = await fetch(\`\${this.baseUrl}/save\`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-      credentials: "include",
-    });
+    try {
+      const response = await fetch(\`\${this.baseUrl}/save\`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+        credentials: "include",
+      });
 
-    if (!response.ok) throw new Error("Failed to save ${name} changes");
-    return response.json();
+      if (!response.ok) throw new Error("Failed to save ${name} changes");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to save ${name} changes");
+    }
   }
 }
 
@@ -1506,6 +1546,9 @@ export type Change = ${capitalizedName}Event | OtherEvent;`)
   );
 
   spinner.succeed("API integration info created");
+
+  // Create PAGE.md
+  await createPageMd(name, "dashboard");
 }
 
 async function createGalleryPageFlow(
@@ -1539,9 +1582,18 @@ async function createGalleryPageFlow(
   // Step 2: Create index.tsx
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
+import { Toaster } from "~/components/ui/toast";
 import "../styles/app.css";
 
-render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+render(
+  () => (
+    <>
+      <${capitalizedName} />
+      <Toaster />
+    </>
+  ),
+  document.getElementById("root")!
+);`;
 
   await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
 
@@ -1833,18 +1885,37 @@ export function use${capitalizedName}() {
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
-    const response = await fetch(\`\${this.baseUrl}/load\`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
+  private handleError(error: unknown, context: string): never {
+    const errorMessage =
+      error instanceof Error ? error.message : "Network error";
+    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+    showToast({
+      title: "Network Error",
+      description: \`\${context}: \${errorMessage}\`,
+      variant: "destructive",
     });
 
-    if (!response.ok) throw new Error("Failed to load ${name}");
-    return response.json();
+    throw error;
+  }
+
+  async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
+    try {
+      const response = await fetch(\`\${this.baseUrl}/load\`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) throw new Error("Failed to load ${name}");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to load ${name}");
+    }
   }
 }
 
@@ -1919,6 +1990,9 @@ app.get("/api/${name}/load", async (c) => {
   );
 
   spinner.succeed("API integration info created");
+
+  // Create PAGE.md
+  await createPageMd(name, "gallery");
 }
 
 async function addRoutesToIndex(
@@ -1944,13 +2018,16 @@ async function addRoutesToIndex(
   let updatedContent = routesContent;
 
   // Add ContentfulStatusCode import if not present
-  if (!routesContent.includes('ContentfulStatusCode')) {
+  if (!routesContent.includes("ContentfulStatusCode")) {
     const contentfulImportMatch = updatedContent.match(
       /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
     );
     if (!contentfulImportMatch) {
       // Add the import after the first import statement
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      const firstImportEnd = updatedContent.indexOf(
+        "\n",
+        updatedContent.indexOf("import")
+      );
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
@@ -1960,8 +2037,11 @@ async function addRoutesToIndex(
     } else {
       // ContentfulStatusCode might already be imported, check if it's in the list
       const existingImports = contentfulImportMatch[1].trim();
-      if (!existingImports.includes('ContentfulStatusCode')) {
-        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+      if (!existingImports.includes("ContentfulStatusCode")) {
+        const newImports = `${existingImports.replace(
+          /,\s*$/,
+          ""
+        )}, ContentfulStatusCode`;
         updatedContent = updatedContent.replace(
           contentfulImportMatch[0],
           `import { ${newImports} } from "hono/utils/http-status";`
@@ -2178,11 +2258,6 @@ async function addGalleryRoutesToIndex(
   const routesToAdd = `
 // ${capitalizedName} endpoints
 app.get("/api/${name}/load", async (c) => {
-  const user = await getAuthenticatedUser(c);
-  if (!user) {
-    return sendError(c, 401, "Unauthorized");
-  }
-
   // TODO: Implement load logic for ${name}
   // Example: Query your schema tables and return data
   const data = {
@@ -2229,7 +2304,9 @@ async function addGalleryUserShardFunctions(
   spinner: any
 ) {
   // No longer adding functions to UserShard - logic has moved to route handlers
-  spinner.succeed("Skipped gallery UserShard functions (logic moved to route handlers)");
+  spinner.succeed(
+    "Skipped gallery UserShard functions (logic moved to route handlers)"
+  );
 }
 
 async function addUserShardFunctions(
@@ -2238,7 +2315,9 @@ async function addUserShardFunctions(
   spinner: any
 ) {
   // No longer adding functions to UserShard - logic has moved to route handlers
-  spinner.succeed("Skipped UserShard functions (logic moved to route handlers)");
+  spinner.succeed(
+    "Skipped UserShard functions (logic moved to route handlers)"
+  );
 }
 
 async function createEventsFile(name: string, spinner: any) {
@@ -2368,9 +2447,18 @@ async function createItemPageFlow(
   // Step 2: Create index.tsx (simple entry point)
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
+import { Toaster } from "~/components/ui/toast";
 import "../styles/app.css";
 
-render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+render(
+  () => (
+    <>
+      <${capitalizedName} />
+      <Toaster />
+    </>
+  ),
+  document.getElementById("root")!
+);`;
 
   await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
 
@@ -2709,33 +2797,56 @@ export function process${capitalizedName}EventResult(
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  async load${capitalizedName}(id: string): Promise<Load${capitalizedName}Response> {
-    const response = await fetch(\`\${this.baseUrl}/load?id=\${id}\`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+  private handleError(error: unknown, context: string): never {
+    const errorMessage =
+      error instanceof Error ? error.message : "Network error";
+    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+    showToast({
+      title: "Network Error",
+      description: \`\${context}: \${errorMessage}\`,
+      variant: "destructive",
     });
 
-    if (!response.ok) throw new Error("Failed to load ${name}");
-    return response.json();
+    throw error;
+  }
+
+  async load${capitalizedName}(id: string): Promise<Load${capitalizedName}Response> {
+    try {
+      const response = await fetch(\`\${this.baseUrl}/load?id=\${id}\`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to load ${name}");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to load ${name}");
+    }
   }
 
   async save${capitalizedName}(
     request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
-    const response = await fetch(\`\${this.baseUrl}/save\`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-      credentials: "include",
-    });
+    try {
+      const response = await fetch(\`\${this.baseUrl}/save\`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+        credentials: "include",
+      });
 
-    if (!response.ok) throw new Error("Failed to save ${name} changes");
-    return response.json();
+      if (!response.ok) throw new Error("Failed to save ${name} changes");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to save ${name} changes");
+    }
   }
 }
 
@@ -2959,6 +3070,9 @@ export class ${capitalizedName}UndoRedoService {
   spinner.start("Updating vite.config.ts...");
   await updateViteConfig(name);
   spinner.succeed("Updated vite.config.ts");
+
+  // Create PAGE.md
+  await createPageMd(name, "item");
 }
 
 async function createRedirectPageFlow(
@@ -2992,9 +3106,18 @@ async function createRedirectPageFlow(
   // Step 2: Create index.tsx
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
+import { Toaster } from "~/components/ui/toast";
 import "../styles/app.css";
 
-render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+render(
+  () => (
+    <>
+      <${capitalizedName} />
+      <Toaster />
+    </>
+  ),
+  document.getElementById("root")!
+);`;
 
   await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
 
@@ -3081,10 +3204,12 @@ export default function ${capitalizedName}() {
               when={!redirectData.loading && !redirectData.error}
               fallback={
                 <Show
-                  when={redirectData.error}
+                  when={redirectData.error as Error}
                   fallback={<LoadingSpinner />}
                 >
-                  <ErrorDisplay message={redirectData.error?.message || "Failed to process code"} />
+                  <ErrorDisplay
+                    message={(redirectData.error as Error)?.message || "Failed to process code"}
+                  />
                 </Show>
               }
             >
@@ -3122,19 +3247,38 @@ export default function ${capitalizedName}() {
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  async process${capitalizedName}Code(code: string): Promise<Process${capitalizedName}CodeResponse> {
-    const response = await fetch(\`\${this.baseUrl}/code?code=\${code}\`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+  private handleError(error: unknown, context: string): never {
+    const errorMessage =
+      error instanceof Error ? error.message : "Network error";
+    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+    showToast({
+      title: "Network Error",
+      description: \`\${context}: \${errorMessage}\`,
+      variant: "destructive",
     });
 
-    if (!response.ok) throw new Error("Failed to process ${name} code");
-    return response.json();
+    throw error;
+  }
+
+  async process${capitalizedName}Code(code: string): Promise<Process${capitalizedName}CodeResponse> {
+    try {
+      const response = await fetch(\`\${this.baseUrl}/code?code=\${code}\`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to process ${name} code");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to process ${name} code");
+    }
   }
 }
 
@@ -3194,6 +3338,9 @@ ${typesToAppend}`;
   spinner.start("Updating vite.config.ts...");
   await updateViteConfig(name);
   spinner.succeed("Updated vite.config.ts");
+
+  // Create PAGE.md
+  await createPageMd(name, "redirect");
 }
 
 async function addItemRoutesToIndex(
@@ -3219,13 +3366,16 @@ async function addItemRoutesToIndex(
   let updatedContent = routesContent;
 
   // Add ContentfulStatusCode import if not present
-  if (!routesContent.includes('ContentfulStatusCode')) {
+  if (!routesContent.includes("ContentfulStatusCode")) {
     const contentfulImportMatch = updatedContent.match(
       /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
     );
     if (!contentfulImportMatch) {
       // Add the import after the first import statement
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      const firstImportEnd = updatedContent.indexOf(
+        "\n",
+        updatedContent.indexOf("import")
+      );
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
@@ -3235,8 +3385,11 @@ async function addItemRoutesToIndex(
     } else {
       // ContentfulStatusCode might already be imported, check if it's in the list
       const existingImports = contentfulImportMatch[1].trim();
-      if (!existingImports.includes('ContentfulStatusCode')) {
-        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+      if (!existingImports.includes("ContentfulStatusCode")) {
+        const newImports = `${existingImports.replace(
+          /,\s*$/,
+          ""
+        )}, ContentfulStatusCode`;
         updatedContent = updatedContent.replace(
           contentfulImportMatch[0],
           `import { ${newImports} } from "hono/utils/http-status";`
@@ -3252,14 +3405,20 @@ async function addItemRoutesToIndex(
     );
     if (importMatch) {
       const existingImports = importMatch[1].trim();
-      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Load${capitalizedName}Response,\n  Load${capitalizedName}ResponseSchema,\n  Save${capitalizedName}Response,\n  Save${capitalizedName}RequestSchema,\n  Save${capitalizedName}ResponseSchema`;
+      const newImports = `${existingImports.replace(
+        /,\s*$/,
+        ""
+      )},\n  Load${capitalizedName}Response,\n  Load${capitalizedName}ResponseSchema,\n  Save${capitalizedName}Response,\n  Save${capitalizedName}RequestSchema,\n  Save${capitalizedName}ResponseSchema`;
       updatedContent = updatedContent.replace(
         importMatch[0],
         `import {${newImports}} from "@shared/types/request-response-schemas";`
       );
     } else {
       // Add the import if it doesn't exist
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      const firstImportEnd = updatedContent.indexOf(
+        "\n",
+        updatedContent.indexOf("import")
+      );
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
@@ -3273,7 +3432,7 @@ async function addItemRoutesToIndex(
   if (!routesContent.includes(`${capitalizedName}EventResult`)) {
     const firstImportIndex = updatedContent.indexOf("import");
     if (firstImportIndex !== -1) {
-      const importToAdd = `import { ${capitalizedName}EventResult } from "@shared/types/${camelName}Events";\n`;
+      const importToAdd = `import { ${capitalizedName}EventResult, ${capitalizedName}Change } from "@shared/types/${camelName}Events";\nimport { handle${capitalizedName}Change } from "@shared/types/${camelName}Events";\n`;
       updatedContent =
         updatedContent.slice(0, firstImportIndex) +
         importToAdd +
@@ -3325,20 +3484,22 @@ app.post(
     let processedCount = 0;
 
     for (const event of events) {
-      // TODO: Process each event and update your data
-      // Example event processing:
-      switch (event.type) {
-        case "SAMPLE_${toScreamingSnakeCase(name)}_EVENT": {
-          // Process the event
-          processedCount++;
-          results.push({
-            type: event.type,
-            // Add result data
-          } as ${capitalizedName}EventResult);
-          break;
-        }
-        default:
-          console.warn("Unknown ${name} event type:", event);
+      // Server adds persistence metadata
+      const change: ${capitalizedName}Change = {
+        ...event,
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        description: \`\${event.type} event\`,
+      };
+
+      const result = await handle${capitalizedName}Change(
+        c.env.DB,
+        change
+      );
+
+      if (result.success && result.result) {
+        results.push(result.result);
+        processedCount++;
       }
     }
 
@@ -3369,7 +3530,9 @@ async function addItemUserShardFunctions(
   spinner: any
 ) {
   // No longer adding functions to UserShard - logic has moved to route handlers
-  spinner.succeed("Skipped item UserShard functions (logic moved to route handlers)");
+  spinner.succeed(
+    "Skipped item UserShard functions (logic moved to route handlers)"
+  );
 }
 
 async function addRedirectRoutesToIndex(
@@ -3394,13 +3557,16 @@ async function addRedirectRoutesToIndex(
   let updatedContent = routesContent;
 
   // Add ContentfulStatusCode import if not present
-  if (!routesContent.includes('ContentfulStatusCode')) {
+  if (!routesContent.includes("ContentfulStatusCode")) {
     const contentfulImportMatch = updatedContent.match(
       /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
     );
     if (!contentfulImportMatch) {
       // Add the import after the first import statement
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      const firstImportEnd = updatedContent.indexOf(
+        "\n",
+        updatedContent.indexOf("import")
+      );
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
@@ -3410,8 +3576,11 @@ async function addRedirectRoutesToIndex(
     } else {
       // ContentfulStatusCode might already be imported, check if it's in the list
       const existingImports = contentfulImportMatch[1].trim();
-      if (!existingImports.includes('ContentfulStatusCode')) {
-        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+      if (!existingImports.includes("ContentfulStatusCode")) {
+        const newImports = `${existingImports.replace(
+          /,\s*$/,
+          ""
+        )}, ContentfulStatusCode`;
         updatedContent = updatedContent.replace(
           contentfulImportMatch[0],
           `import { ${newImports} } from "hono/utils/http-status";`
@@ -3427,14 +3596,20 @@ async function addRedirectRoutesToIndex(
     );
     if (importMatch) {
       const existingImports = importMatch[1].trim();
-      const newImports = `${existingImports.replace(/,\s*$/, "")},\n  Process${capitalizedName}CodeResponseSchema`;
+      const newImports = `${existingImports.replace(
+        /,\s*$/,
+        ""
+      )},\n  Process${capitalizedName}CodeResponseSchema`;
       updatedContent = updatedContent.replace(
         importMatch[0],
         `import {${newImports}} from "@shared/types/request-response-schemas";`
       );
     } else {
       // Add the import if it doesn't exist
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      const firstImportEnd = updatedContent.indexOf(
+        "\n",
+        updatedContent.indexOf("import")
+      );
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
@@ -3464,6 +3639,7 @@ app.get("/api/${name}/code", async (c) => {
   // For example, exchange the code for an access token from an OAuth provider
   const result = {
     success: true,
+    redirectUrl: "https://example.com",
     // Add your response data here
   };
 
@@ -3488,7 +3664,9 @@ async function addRedirectUserShardFunctions(
   spinner: any
 ) {
   // No longer adding functions to UserShard - logic has moved to route handlers
-  spinner.succeed("Skipped redirect UserShard functions (logic moved to route handlers)");
+  spinner.succeed(
+    "Skipped redirect UserShard functions (logic moved to route handlers)"
+  );
 }
 
 async function createFeedPageFlow(
@@ -3523,9 +3701,18 @@ async function createFeedPageFlow(
   // Step 2: Create index.tsx (simple entry point)
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
+import { Toaster } from "~/components/ui/toast";
 import "../styles/app.css";
 
-render(() => <${capitalizedName} />, document.getElementById("root")!);`;
+render(
+  () => (
+    <>
+      <${capitalizedName} />
+      <Toaster />
+    </>
+  ),
+  document.getElementById("root")!
+);`;
 
   await fs.outputFile(`src/client/${name}/index.tsx`, indexTsx);
 
@@ -3675,7 +3862,7 @@ function ${capitalizedName}Content() {
           !store.isLoadingMore &&
           store.continuationToken
         ) {
-          actions.loadMore${capitalizedName}();
+          void actions.loadMore${capitalizedName}();
         }
       },
       { rootMargin: "100px" }
@@ -3741,7 +3928,7 @@ function ${capitalizedName}Content() {
                 <Icon path={ellipsisHorizontal} class="w-5 h-5" />
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onSelect={logout}>
+                <DropdownMenuItem onClick={() => void logout()}>
                   <Icon path={arrowRightOnRectangle} class="w-4 h-4 mr-2" />
                   Sign out
                 </DropdownMenuItem>
@@ -4116,37 +4303,60 @@ export function process${capitalizedName}EventResult(
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  async load${capitalizedName}(continuationToken?: string): Promise<Load${capitalizedName}Response> {
-    const url = continuationToken
-      ? \`\${this.baseUrl}/load?continuationToken=\${encodeURIComponent(continuationToken)}\`
-      : \`\${this.baseUrl}/load\`;
+  private handleError(error: unknown, context: string): never {
+    const errorMessage =
+      error instanceof Error ? error.message : "Network error";
+    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+    showToast({
+      title: "Network Error",
+      description: \`\${context}: \${errorMessage}\`,
+      variant: "destructive",
     });
 
-    if (!response.ok) throw new Error("Failed to load ${name}");
-    return response.json();
+    throw error;
+  }
+
+  async load${capitalizedName}(continuationToken?: string): Promise<Load${capitalizedName}Response> {
+    try {
+      const url = continuationToken
+        ? \`\${this.baseUrl}/load?continuationToken=\${encodeURIComponent(continuationToken)}\`
+        : \`\${this.baseUrl}/load\`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to load ${name}");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to load ${name}");
+    }
   }
 
   async save${capitalizedName}(
     request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
-    const response = await fetch(\`\${this.baseUrl}/save\`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-      credentials: "include",
-    });
+    try {
+      const response = await fetch(\`\${this.baseUrl}/save\`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+        credentials: "include",
+      });
 
-    if (!response.ok) throw new Error("Failed to save ${name} changes");
-    return response.json();
+      if (!response.ok) throw new Error("Failed to save ${name} changes");
+      return response.json();
+    } catch (error) {
+      return this.handleError(error, "Failed to save ${name} changes");
+    }
   }
 }
 
@@ -4364,6 +4574,9 @@ export class ${capitalizedName}UndoRedoService {
 
   // Step 12: Create events file
   await createFeedEventsFile(name, spinner);
+
+  // Create PAGE.md
+  await createPageMd(name, "feed");
 }
 
 // Shared helper functions for creating services and routes
@@ -4391,13 +4604,16 @@ async function addFeedRoutesToIndex(
   let updatedContent = routesContent;
 
   // Add ContentfulStatusCode import if not present
-  if (!routesContent.includes('ContentfulStatusCode')) {
+  if (!routesContent.includes("ContentfulStatusCode")) {
     const contentfulImportMatch = updatedContent.match(
       /import\s+{([^}]+)}\s+from\s+["']hono\/utils\/http-status["'];?/
     );
     if (!contentfulImportMatch) {
       // Add the import after the first import statement
-      const firstImportEnd = updatedContent.indexOf('\n', updatedContent.indexOf('import'));
+      const firstImportEnd = updatedContent.indexOf(
+        "\n",
+        updatedContent.indexOf("import")
+      );
       if (firstImportEnd !== -1) {
         updatedContent =
           updatedContent.slice(0, firstImportEnd + 1) +
@@ -4407,8 +4623,11 @@ async function addFeedRoutesToIndex(
     } else {
       // ContentfulStatusCode might already be imported, check if it's in the list
       const existingImports = contentfulImportMatch[1].trim();
-      if (!existingImports.includes('ContentfulStatusCode')) {
-        const newImports = `${existingImports.replace(/,\s*$/, "")}, ContentfulStatusCode`;
+      if (!existingImports.includes("ContentfulStatusCode")) {
+        const newImports = `${existingImports.replace(
+          /,\s*$/,
+          ""
+        )}, ContentfulStatusCode`;
         updatedContent = updatedContent.replace(
           contentfulImportMatch[0],
           `import { ${newImports} } from "hono/utils/http-status";`
@@ -4569,7 +4788,37 @@ async function addFeedUserShardFunctions(
   spinner: any
 ) {
   // No longer adding functions to UserShard - logic has moved to route handlers
-  spinner.succeed("Skipped feed UserShard functions (logic moved to route handlers)");
+  spinner.succeed(
+    "Skipped feed UserShard functions (logic moved to route handlers)"
+  );
+}
+
+/**
+ * Create PAGE.md file with a description of the page type
+ */
+async function createPageMd(name: string, pageType: string) {
+  const capitalizedName = toPascalCase(name);
+
+  const descriptions: Record<string, string> = {
+    static: "Simple HTML page with navigation and hero section, clicking \"Get Started\" navigates to dashboard.",
+    dashboard: "Interactive page with context and state management, user interactions trigger change events and autosave.",
+    feed: "Displays paginated list items with sidebar, scrolling loads more items and clicking items shows details.",
+    item: "Shows individual item details with editing capabilities, changes trigger save events and update context.",
+    gallery: "Displays items in grid layout with sidebar navigation, clicking items opens detail view.",
+    redirect: "Fetches redirect URL from API and automatically navigates user to target location."
+  };
+
+  const description = descriptions[pageType] || "Custom page with interactive elements.";
+
+  const pageMdContent = `---
+name: ${capitalizedName}
+path: ${name}
+type: ${pageType}
+description: ${description}
+---
+`;
+
+  await fs.outputFile(`src/client/${name}/PAGE.md`, pageMdContent);
 }
 
 async function createFeedEventsFile(name: string, spinner: any) {
