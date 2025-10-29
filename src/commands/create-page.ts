@@ -625,8 +625,31 @@ async function createDashboardPageFlow(
   // Step 2: Create index.tsx (simple entry point)
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
-import { Toaster } from "~/components/ui/toast";
+import { Toaster, showToast } from "~/components/ui/toast";
 import "../styles/app.css";
+
+// Intercept console.error to show toasts
+const originalConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  // Still call the original console.error so errors appear in console
+  originalConsoleError.apply(console, args);
+
+  // Show toast with the error message
+  const errorMessage = args
+    .map(arg => {
+      if (arg instanceof Error) return arg.message;
+      if (typeof arg === 'object') return JSON.stringify(arg);
+      return String(arg);
+    })
+    .join(' ');
+
+  showToast({
+    title: "Error",
+    description: errorMessage,
+    variant: "error",
+    duration: 5000,
+  });
+};
 
 render(
   () => (
@@ -1224,7 +1247,6 @@ export function process${capitalizedName}EventResult(
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
-import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
@@ -1232,13 +1254,7 @@ class ${capitalizedName}ApiClient {
   private handleError(error: unknown, context: string): never {
     const errorMessage =
       error instanceof Error ? error.message : "Network error";
-    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
-
-    showToast({
-      title: "Network Error",
-      description: \`\${context}: \${errorMessage}\`,
-      variant: "destructive",
-    });
+    console.error(\`Network Error - \${context}: \${errorMessage}\`);
 
     throw error;
   }
@@ -1582,8 +1598,31 @@ async function createGalleryPageFlow(
   // Step 2: Create index.tsx
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
-import { Toaster } from "~/components/ui/toast";
+import { Toaster, showToast } from "~/components/ui/toast";
 import "../styles/app.css";
+
+// Intercept console.error to show toasts
+const originalConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  // Still call the original console.error so errors appear in console
+  originalConsoleError.apply(console, args);
+
+  // Show toast with the error message
+  const errorMessage = args
+    .map(arg => {
+      if (arg instanceof Error) return arg.message;
+      if (typeof arg === 'object') return JSON.stringify(arg);
+      return String(arg);
+    })
+    .join(' ');
+
+  showToast({
+    title: "Error",
+    description: errorMessage,
+    variant: "error",
+    duration: 5000,
+  });
+};
 
 render(
   () => (
@@ -1885,7 +1924,6 @@ export function use${capitalizedName}() {
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
-import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
@@ -1893,13 +1931,7 @@ class ${capitalizedName}ApiClient {
   private handleError(error: unknown, context: string): never {
     const errorMessage =
       error instanceof Error ? error.message : "Network error";
-    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
-
-    showToast({
-      title: "Network Error",
-      description: \`\${context}: \${errorMessage}\`,
-      variant: "destructive",
-    });
+    console.error(\`Network Error - \${context}: \${errorMessage}\`);
 
     throw error;
   }
@@ -2190,8 +2222,9 @@ app.post(
         "\n" +
         updatedContent.slice(exportDefaultIndex);
     } else {
-      // If no export default, add at the end
-      updatedContent += routesToAdd;
+      // If neither found, add before export statement or at the end
+      console.warn("Warning: Could not find 404 handler or export default. Adding routes at the end.");
+      updatedContent += "\n" + routesToAdd;
     }
   }
 
@@ -2289,8 +2322,9 @@ app.get("/api/${name}/load", async (c) => {
         "\n" +
         updatedContent.slice(exportDefaultIndex);
     } else {
-      // If no export default, add at the end
-      updatedContent += routesToAdd;
+      // If neither found, add before export statement or at the end
+      console.warn("Warning: Could not find 404 handler or export default. Adding routes at the end.");
+      updatedContent += "\n" + routesToAdd;
     }
   }
 
@@ -2447,8 +2481,31 @@ async function createItemPageFlow(
   // Step 2: Create index.tsx (simple entry point)
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
-import { Toaster } from "~/components/ui/toast";
+import { Toaster, showToast } from "~/components/ui/toast";
 import "../styles/app.css";
+
+// Intercept console.error to show toasts
+const originalConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  // Still call the original console.error so errors appear in console
+  originalConsoleError.apply(console, args);
+
+  // Show toast with the error message
+  const errorMessage = args
+    .map(arg => {
+      if (arg instanceof Error) return arg.message;
+      if (typeof arg === 'object') return JSON.stringify(arg);
+      return String(arg);
+    })
+    .join(' ');
+
+  showToast({
+    title: "Error",
+    description: errorMessage,
+    variant: "error",
+    duration: 5000,
+  });
+};
 
 render(
   () => (
@@ -2797,7 +2854,6 @@ export function process${capitalizedName}EventResult(
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
-import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
@@ -2805,13 +2861,7 @@ class ${capitalizedName}ApiClient {
   private handleError(error: unknown, context: string): never {
     const errorMessage =
       error instanceof Error ? error.message : "Network error";
-    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
-
-    showToast({
-      title: "Network Error",
-      description: \`\${context}: \${errorMessage}\`,
-      variant: "destructive",
-    });
+    console.error(\`Network Error - \${context}: \${errorMessage}\`);
 
     throw error;
   }
@@ -3106,8 +3156,31 @@ async function createRedirectPageFlow(
   // Step 2: Create index.tsx
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
-import { Toaster } from "~/components/ui/toast";
+import { Toaster, showToast } from "~/components/ui/toast";
 import "../styles/app.css";
+
+// Intercept console.error to show toasts
+const originalConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  // Still call the original console.error so errors appear in console
+  originalConsoleError.apply(console, args);
+
+  // Show toast with the error message
+  const errorMessage = args
+    .map(arg => {
+      if (arg instanceof Error) return arg.message;
+      if (typeof arg === 'object') return JSON.stringify(arg);
+      return String(arg);
+    })
+    .join(' ');
+
+  showToast({
+    title: "Error",
+    description: errorMessage,
+    variant: "error",
+    duration: 5000,
+  });
+};
 
 render(
   () => (
@@ -3247,7 +3320,6 @@ export default function ${capitalizedName}() {
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
-import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
@@ -3255,13 +3327,7 @@ class ${capitalizedName}ApiClient {
   private handleError(error: unknown, context: string): never {
     const errorMessage =
       error instanceof Error ? error.message : "Network error";
-    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
-
-    showToast({
-      title: "Network Error",
-      description: \`\${context}: \${errorMessage}\`,
-      variant: "destructive",
-    });
+    console.error(\`Network Error - \${context}: \${errorMessage}\`);
 
     throw error;
   }
@@ -3440,10 +3506,7 @@ async function addItemRoutesToIndex(
     }
   }
 
-  // Add routes before the export statement
-  const exportMatch = updatedContent.match(/export\s+(default\s+)?app;/);
-  if (exportMatch) {
-    const routesToAdd = `
+  const routesToAdd = `
 // ${capitalizedName} routes
 app.get("/api/${name}/load", async (c) => {
   const user = await getAuthenticatedUser(c);
@@ -3514,10 +3577,28 @@ app.post(
 
 `;
 
-    updatedContent = updatedContent.replace(
-      exportMatch[0],
-      `${routesToAdd}${exportMatch[0]}`
-    );
+  // Find the 404 catchall route and add routes before it
+  const catchallIndex = updatedContent.indexOf('app.get("*"');
+  if (catchallIndex !== -1) {
+    updatedContent =
+      updatedContent.slice(0, catchallIndex) +
+      routesToAdd +
+      "\n" +
+      updatedContent.slice(catchallIndex);
+  } else {
+    // If no catchall found, find export default and add before it
+    const exportDefaultIndex = updatedContent.lastIndexOf("export default");
+    if (exportDefaultIndex !== -1) {
+      updatedContent =
+        updatedContent.slice(0, exportDefaultIndex) +
+        routesToAdd +
+        "\n" +
+        updatedContent.slice(exportDefaultIndex);
+    } else {
+      // If neither found, add before export statement or at the end
+      console.warn("Warning: Could not find 404 handler or export default. Adding routes at the end.");
+      updatedContent += "\n" + routesToAdd;
+    }
   }
 
   await fs.writeFile(routesPath, updatedContent);
@@ -3619,10 +3700,7 @@ async function addRedirectRoutesToIndex(
     }
   }
 
-  // Add routes before the export statement
-  const exportMatch = updatedContent.match(/export\s+(default\s+)?app;/);
-  if (exportMatch) {
-    const routesToAdd = `
+  const routesToAdd = `
 // ${capitalizedName} routes
 app.get("/api/${name}/code", async (c) => {
   const user = await getAuthenticatedUser(c);
@@ -3648,10 +3726,28 @@ app.get("/api/${name}/code", async (c) => {
 
 `;
 
-    updatedContent = updatedContent.replace(
-      exportMatch[0],
-      `${routesToAdd}${exportMatch[0]}`
-    );
+  // Find the 404 catchall route and add routes before it
+  const catchallIndex = updatedContent.indexOf('app.get("*"');
+  if (catchallIndex !== -1) {
+    updatedContent =
+      updatedContent.slice(0, catchallIndex) +
+      routesToAdd +
+      "\n" +
+      updatedContent.slice(catchallIndex);
+  } else {
+    // If no catchall found, find export default and add before it
+    const exportDefaultIndex = updatedContent.lastIndexOf("export default");
+    if (exportDefaultIndex !== -1) {
+      updatedContent =
+        updatedContent.slice(0, exportDefaultIndex) +
+        routesToAdd +
+        "\n" +
+        updatedContent.slice(exportDefaultIndex);
+    } else {
+      // If neither found, add before export statement or at the end
+      console.warn("Warning: Could not find 404 handler or export default. Adding routes at the end.");
+      updatedContent += "\n" + routesToAdd;
+    }
   }
 
   await fs.writeFile(routesPath, updatedContent);
@@ -3701,8 +3797,31 @@ async function createFeedPageFlow(
   // Step 2: Create index.tsx (simple entry point)
   const indexTsx = `import { render } from "solid-js/web";
 import ${capitalizedName} from "./${capitalizedName}";
-import { Toaster } from "~/components/ui/toast";
+import { Toaster, showToast } from "~/components/ui/toast";
 import "../styles/app.css";
+
+// Intercept console.error to show toasts
+const originalConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  // Still call the original console.error so errors appear in console
+  originalConsoleError.apply(console, args);
+
+  // Show toast with the error message
+  const errorMessage = args
+    .map(arg => {
+      if (arg instanceof Error) return arg.message;
+      if (typeof arg === 'object') return JSON.stringify(arg);
+      return String(arg);
+    })
+    .join(' ');
+
+  showToast({
+    title: "Error",
+    description: errorMessage,
+    variant: "error",
+    duration: 5000,
+  });
+};
 
 render(
   () => (
@@ -4303,7 +4422,6 @@ export function process${capitalizedName}EventResult(
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
-import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
@@ -4311,13 +4429,7 @@ class ${capitalizedName}ApiClient {
   private handleError(error: unknown, context: string): never {
     const errorMessage =
       error instanceof Error ? error.message : "Network error";
-    console.error(\`[${capitalizedName}Api] \${context}:\`, error);
-
-    showToast({
-      title: "Network Error",
-      description: \`\${context}: \${errorMessage}\`,
-      variant: "destructive",
-    });
+    console.error(\`Network Error - \${context}: \${errorMessage}\`);
 
     throw error;
   }
@@ -4773,8 +4885,9 @@ app.post(
         "\n" +
         updatedContent.slice(exportDefaultIndex);
     } else {
-      // If no export default, add at the end
-      updatedContent += routesToAdd;
+      // If neither found, add before export statement or at the end
+      console.warn("Warning: Could not find 404 handler or export default. Adding routes at the end.");
+      updatedContent += "\n" + routesToAdd;
     }
   }
 
