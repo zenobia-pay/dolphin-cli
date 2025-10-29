@@ -2150,6 +2150,7 @@ app.get("/api/${name}/load", async (c) => {
 
   // TODO: Implement load logic for ${name}
   // Example: Query your schema tables and return data
+  const db = drizzle(c.env.DB);
   const data = {
     // Add your data loading logic here
   };
@@ -2293,6 +2294,7 @@ async function addGalleryRoutesToIndex(
 app.get("/api/${name}/load", async (c) => {
   // TODO: Implement load logic for ${name}
   // Example: Query your schema tables and return data
+  const db = drizzle(c.env.DB);
   const data = {
     // Add your data loading logic here
   };
@@ -3521,6 +3523,7 @@ app.get("/api/${name}/load", async (c) => {
 
   // TODO: Implement load logic for ${name} with id parameter
   // Example: Query your schema tables using the id and return data
+  const db = drizzle(c.env.DB);
   const data = {
     // Add your data loading logic here
     // Use the id parameter to fetch specific item
@@ -3715,6 +3718,7 @@ app.get("/api/${name}/code", async (c) => {
 
   // TODO: Implement your redirect code processing logic here
   // For example, exchange the code for an access token from an OAuth provider
+  const db = drizzle(c.env.DB);
   const result = {
     success: true,
     redirectUrl: "https://example.com",
@@ -4817,6 +4821,7 @@ app.get("/api/${name}/load", async (c) => {
   const continuationToken = c.req.query("continuationToken");
 
   // TODO: Implement your feed algorithm here
+  const db = drizzle(c.env.DB);
   return send(c, Load${capitalizedName}ResponseSchema, {
     feedData: [],
     continuationToken: undefined,
