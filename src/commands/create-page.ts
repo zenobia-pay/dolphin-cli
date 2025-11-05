@@ -1241,55 +1241,69 @@ export function process${capitalizedName}EventResult(
   Load${capitalizedName}Response,
   Load${capitalizedName}Request,
   Save${capitalizedName}Request,
-  Save${capitalizedName}Response
+  Save${capitalizedName}Response,
+  ErrorResponse
 } from "${
     relativeImportPath.startsWith(".")
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  private handleError(error: unknown, context: string): never {
-    const errorMessage =
-      error instanceof Error ? error.message : "Network error";
-    console.error(\`Network Error - \${context}: \${errorMessage}\`);
+  private async checkResponse<T>(
+    response: Response,
+    context: string
+  ): Promise<T> {
+    if (!response.ok) {
+      const error = await response.json();
+      const errorMessage =
+        (error as ErrorResponse).message ||
+        (error as ErrorResponse).error ||
+        "Request failed";
 
-    throw error;
+      console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+      showToast({
+        title: context,
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      throw new Error(errorMessage);
+    }
+    return response.json();
   }
 
   async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/load\`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+    const response = await fetch(\`\${this.baseUrl}/load\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to load ${name}");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to load ${name}");
-    }
+    return this.checkResponse<Load${capitalizedName}Response>(
+      response,
+      "Failed to load ${name}"
+    );
   }
 
   async save${capitalizedName}(
     request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/save\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-        credentials: "include",
-      });
+    const response = await fetch(\`\${this.baseUrl}/save\`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to save ${name} changes");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to save ${name} changes");
-    }
+    return this.checkResponse<Save${capitalizedName}Response>(
+      response,
+      "Failed to save ${name} changes"
+    );
   }
 }
 
@@ -1919,35 +1933,51 @@ export function use${capitalizedName}() {
 
   const apiClientFile = `import type {
   Load${capitalizedName}Response,
+  ErrorResponse
 } from "${
     relativeImportPath.startsWith(".")
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  private handleError(error: unknown, context: string): never {
-    const errorMessage =
-      error instanceof Error ? error.message : "Network error";
-    console.error(\`Network Error - \${context}: \${errorMessage}\`);
+  private async checkResponse<T>(
+    response: Response,
+    context: string
+  ): Promise<T> {
+    if (!response.ok) {
+      const error = await response.json();
+      const errorMessage =
+        (error as ErrorResponse).message ||
+        (error as ErrorResponse).error ||
+        "Request failed";
 
-    throw error;
+      console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+      showToast({
+        title: context,
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      throw new Error(errorMessage);
+    }
+    return response.json();
   }
 
   async load${capitalizedName}(): Promise<Load${capitalizedName}Response> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/load\`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+    const response = await fetch(\`\${this.baseUrl}/load\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
 
-      if (!response.ok) throw new Error("Failed to load ${name}");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to load ${name}");
-    }
+    return this.checkResponse<Load${capitalizedName}Response>(
+      response,
+      "Failed to load ${name}"
+    );
   }
 }
 
@@ -2363,7 +2393,11 @@ async function createEventsFile(name: string, spinner: any) {
   const camelName = toCamelCase(name);
   const snakeName = toScreamingSnakeCase(name);
 
-  const eventsContent = `import type * as schema from "~/db/schema";
+  const eventsContent = `/**
+ * @page-path ${name}
+ */
+
+import type * as schema from "~/db/schema";
 
 // ===== EVENT TYPES (what client sends) =====
 export type Sample${capitalizedName}Event = {
@@ -2850,55 +2884,69 @@ export function process${capitalizedName}EventResult(
   Load${capitalizedName}Response,
   Load${capitalizedName}Request,
   Save${capitalizedName}Request,
-  Save${capitalizedName}Response
+  Save${capitalizedName}Response,
+  ErrorResponse
 } from "${
     relativeImportPath.startsWith(".")
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  private handleError(error: unknown, context: string): never {
-    const errorMessage =
-      error instanceof Error ? error.message : "Network error";
-    console.error(\`Network Error - \${context}: \${errorMessage}\`);
+  private async checkResponse<T>(
+    response: Response,
+    context: string
+  ): Promise<T> {
+    if (!response.ok) {
+      const error = await response.json();
+      const errorMessage =
+        (error as ErrorResponse).message ||
+        (error as ErrorResponse).error ||
+        "Request failed";
 
-    throw error;
+      console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+      showToast({
+        title: context,
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      throw new Error(errorMessage);
+    }
+    return response.json();
   }
 
   async load${capitalizedName}(id: string): Promise<Load${capitalizedName}Response> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/load?id=\${id}\`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+    const response = await fetch(\`\${this.baseUrl}/load?id=\${id}\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to load ${name}");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to load ${name}");
-    }
+    return this.checkResponse<Load${capitalizedName}Response>(
+      response,
+      "Failed to load ${name}"
+    );
   }
 
   async save${capitalizedName}(
     request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/save\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-        credentials: "include",
-      });
+    const response = await fetch(\`\${this.baseUrl}/save\`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to save ${name} changes");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to save ${name} changes");
-    }
+    return this.checkResponse<Save${capitalizedName}Response>(
+      response,
+      "Failed to save ${name} changes"
+    );
   }
 }
 
@@ -3317,36 +3365,52 @@ export default function ${capitalizedName}() {
 
   const apiClientFile = `import type {
   Process${capitalizedName}CodeResponse,
+  ErrorResponse
 } from "${
     relativeImportPath.startsWith(".")
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  private handleError(error: unknown, context: string): never {
-    const errorMessage =
-      error instanceof Error ? error.message : "Network error";
-    console.error(\`Network Error - \${context}: \${errorMessage}\`);
+  private async checkResponse<T>(
+    response: Response,
+    context: string
+  ): Promise<T> {
+    if (!response.ok) {
+      const error = await response.json();
+      const errorMessage =
+        (error as ErrorResponse).message ||
+        (error as ErrorResponse).error ||
+        "Request failed";
 
-    throw error;
+      console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+      showToast({
+        title: context,
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      throw new Error(errorMessage);
+    }
+    return response.json();
   }
 
   async process${capitalizedName}Code(code: string): Promise<Process${capitalizedName}CodeResponse> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/code?code=\${code}\`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+    const response = await fetch(\`\${this.baseUrl}/code?code=\${code}\`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to process ${name} code");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to process ${name} code");
-    }
+    return this.checkResponse<Process${capitalizedName}CodeResponse>(
+      response,
+      "Failed to process ${name} code"
+    );
   }
 }
 
@@ -4420,59 +4484,73 @@ export function process${capitalizedName}EventResult(
   Load${capitalizedName}Response,
   Load${capitalizedName}Request,
   Save${capitalizedName}Request,
-  Save${capitalizedName}Response
+  Save${capitalizedName}Response,
+  ErrorResponse
 } from "${
     relativeImportPath.startsWith(".")
       ? relativeImportPath
       : "./" + relativeImportPath
   }";
+import { showToast } from "~/components/ui/toast";
 
 class ${capitalizedName}ApiClient {
   private baseUrl = "/api/${name}";
 
-  private handleError(error: unknown, context: string): never {
-    const errorMessage =
-      error instanceof Error ? error.message : "Network error";
-    console.error(\`Network Error - \${context}: \${errorMessage}\`);
+  private async checkResponse<T>(
+    response: Response,
+    context: string
+  ): Promise<T> {
+    if (!response.ok) {
+      const error = await response.json();
+      const errorMessage =
+        (error as ErrorResponse).message ||
+        (error as ErrorResponse).error ||
+        "Request failed";
 
-    throw error;
+      console.error(\`[${capitalizedName}Api] \${context}:\`, error);
+
+      showToast({
+        title: context,
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      throw new Error(errorMessage);
+    }
+    return response.json();
   }
 
   async load${capitalizedName}(continuationToken?: string): Promise<Load${capitalizedName}Response> {
-    try {
-      const url = continuationToken
-        ? \`\${this.baseUrl}/load?continuationToken=\${encodeURIComponent(continuationToken)}\`
-        : \`\${this.baseUrl}/load\`;
+    const url = continuationToken
+      ? \`\${this.baseUrl}/load?continuationToken=\${encodeURIComponent(continuationToken)}\`
+      : \`\${this.baseUrl}/load\`;
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to load ${name}");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to load ${name}");
-    }
+    return this.checkResponse<Load${capitalizedName}Response>(
+      response,
+      "Failed to load ${name}"
+    );
   }
 
   async save${capitalizedName}(
     request: Save${capitalizedName}Request
   ): Promise<Save${capitalizedName}Response> {
-    try {
-      const response = await fetch(\`\${this.baseUrl}/save\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-        credentials: "include",
-      });
+    const response = await fetch(\`\${this.baseUrl}/save\`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      credentials: "include",
+    });
 
-      if (!response.ok) throw new Error("Failed to save ${name} changes");
-      return response.json();
-    } catch (error) {
-      return this.handleError(error, "Failed to save ${name} changes");
-    }
+    return this.checkResponse<Save${capitalizedName}Response>(
+      response,
+      "Failed to save ${name} changes"
+    );
   }
 }
 
@@ -4946,7 +5024,11 @@ async function createFeedEventsFile(name: string, spinner: any) {
   const camelName = toCamelCase(name);
   const snakeName = toScreamingSnakeCase(name);
 
-  const eventsContent = `import type * as schema from "~/db/schema";
+  const eventsContent = `/**
+ * @page-path ${name}
+ */
+
+import type * as schema from "~/db/schema";
 
 // ===== EVENT TYPES (what client sends) =====
 export type Sample${capitalizedName}Event = {
