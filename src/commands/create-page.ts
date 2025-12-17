@@ -5048,7 +5048,7 @@ import { login } from '../../playwright-utils/login';
 test.describe('${capitalizedName} Page', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await page.goto('/${name}');
+    await page.goto('/${name}/');
   });
 
   test('page loads', async ({ page }) => {
