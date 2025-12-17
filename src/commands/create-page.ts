@@ -328,6 +328,7 @@ export const createPageCommand = new Command("create-page")
         console.log(chalk.gray("3. Update the load endpoint in your server"));
         console.log(chalk.gray("4. Add change event handlers if needed"));
         console.log(chalk.gray("5. Customize the views and context as needed"));
+        console.log(chalk.gray(`6. Update playwright test at src/client/${name}/${name}.spec.ts`));
       }
     } catch (error) {
       spinner.fail("Page creation failed");
@@ -586,6 +587,9 @@ async function createStaticPageFlow(name: string, spinner: any) {
 
   // Step 2: Create PAGE.md
   await createPageMd(name, "static");
+
+  // Step 2.5: Create Playwright test
+  await createPlaywrightTest(name, "static");
 
   // Step 3: Update vite.config.ts
   spinner.start("Updating vite.config.ts...");
@@ -1565,6 +1569,9 @@ export type Change = ${capitalizedName}Event | OtherEvent;`)
 
   // Create PAGE.md
   await createPageMd(name, "dashboard");
+
+  // Create Playwright test
+  await createPlaywrightTest(name, "dashboard");
 }
 
 async function createGalleryPageFlow(
@@ -2025,6 +2032,9 @@ app.get("/api/${name}/load", async (c) => {
 
   // Create PAGE.md
   await createPageMd(name, "gallery");
+
+  // Create Playwright test
+  await createPlaywrightTest(name, "gallery");
 }
 
 async function addRoutesToIndex(
@@ -3125,6 +3135,9 @@ export class ${capitalizedName}UndoRedoService {
 
   // Create PAGE.md
   await createPageMd(name, "item");
+
+  // Create Playwright test
+  await createPlaywrightTest(name, "item");
 }
 
 async function createRedirectPageFlow(
@@ -3409,6 +3422,9 @@ ${typesToAppend}`;
 
   // Create PAGE.md
   await createPageMd(name, "redirect");
+
+  // Create Playwright test
+  await createPlaywrightTest(name, "redirect");
 }
 
 async function addItemRoutesToIndex(
@@ -4693,6 +4709,9 @@ export class ${capitalizedName}UndoRedoService {
 
   // Create PAGE.md
   await createPageMd(name, "feed");
+
+  // Create Playwright test
+  await createPlaywrightTest(name, "feed");
 }
 
 // Shared helper functions for creating services and routes
@@ -4937,6 +4956,30 @@ description: ${description}
 `;
 
   await fs.outputFile(`src/client/${name}/PAGE.md`, pageMdContent);
+}
+
+/**
+ * Create Playwright test file with login helper
+ */
+async function createPlaywrightTest(name: string, pageType: string) {
+  const capitalizedName = toPascalCase(name);
+
+  const testContent = `import { test, expect } from '@playwright/test';
+import { login } from '../../playwright-utils/login';
+
+test.describe('${capitalizedName} Page', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+    await page.goto('/${name}');
+  });
+
+  test('page loads', async ({ page }) => {
+    // TODO: Add assertions
+  });
+});
+`;
+
+  await fs.outputFile(`src/client/${name}/${name}.spec.ts`, testContent);
 }
 
 async function createFeedEventsFile(name: string, spinner: any) {
