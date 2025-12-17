@@ -16,10 +16,10 @@ export async function updateViteConfig(pageName: string) {
   
   if (inputMatch) {
     const inputContent = inputMatch[1];
-    const newEntry = `        ${pageName}: resolve(__dirname, "src/client/${pageName}/index.html"),`;
+    const newEntry = `        "${pageName}": resolve(__dirname, "src/client/${pageName}/index.html"),`;
     
-    // Check if entry already exists
-    if (!inputContent.includes(`${pageName}:`)) {
+    // Check if entry already exists (check both quoted and unquoted formats)
+    if (!inputContent.includes(`"${pageName}":`)) {
       // Add the new entry
       const updatedInput = inputContent.trimEnd() + '\n' + newEntry;
       content = content.replace(
